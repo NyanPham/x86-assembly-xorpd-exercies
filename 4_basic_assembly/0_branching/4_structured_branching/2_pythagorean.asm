@@ -1,3 +1,8 @@
+; 2. Write a program that takes the number n as input, and prints back all the
+; triples (a,b,c), such that a^2 + b^2 = c^2. 
+
+; These are all the pythagorean triples not larger than n.
+
 format PE console
 entry start
 

@@ -1,3 +1,4 @@
+; 0. Write a program the receives three numbers and sums those three numbers. Then output the result.
 
 format PE console
 entry start

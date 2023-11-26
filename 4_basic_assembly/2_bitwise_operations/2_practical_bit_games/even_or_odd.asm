@@ -1,3 +1,7 @@
+; 0.0   Write a program that takes a number x as input, and returns:
+; - 0 if x is even.
+; - 1 if x is odd. 
+
 format PE console
 entry start
 

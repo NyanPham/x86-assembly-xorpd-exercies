@@ -1,3 +1,5 @@
+; 1. Write a program that receives two numbers a,b and calculates their integral average.
+
 
 format PE console
 entry start

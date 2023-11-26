@@ -1,3 +1,5 @@
+; 0.0 Write a program that takes the value n as input, and finds the sum of all the odd numbers between 1 and 2n+1, inclusive.
+
 format PE console
 entry start
 
