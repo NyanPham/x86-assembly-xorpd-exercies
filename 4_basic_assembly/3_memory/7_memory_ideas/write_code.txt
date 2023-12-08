@@ -89,7 +89,7 @@ expected.
               1 2
               2 3
               3 4
-
+	
     1.2   Print some cells of table A and table B to make sure that your code
           works correctly.
 
