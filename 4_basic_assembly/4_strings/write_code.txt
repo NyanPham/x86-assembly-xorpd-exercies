@@ -74,7 +74,7 @@ screen.
 
 
 3.  Common sense
-
+	
     Write a program that reads a string from the user, and then finds out the
     most common character in the string. (Don't count spaces).
     
@@ -87,7 +87,7 @@ screen.
 
       Output: The character e is the most common character on the string.
               Amount of occurrences: 8
-
+	
 
 4.  Substring
 
