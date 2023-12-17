@@ -95,7 +95,7 @@ screen.
     
     The program then searches for all the occurrences of s2 inside s1, and prints
     back to the user the locations of all the found occurrences.
-
+	
     Example:
       
       Input:  s1 = 'the colors of my seas are always with me.'
@@ -110,7 +110,7 @@ screen.
               0
               23
 
-
+	
 5.  Number to String
 
     We are going to write a program that converts a number into its base 10
