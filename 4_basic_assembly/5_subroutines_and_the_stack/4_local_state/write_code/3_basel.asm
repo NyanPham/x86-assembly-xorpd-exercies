@@ -8,9 +8,11 @@ struct FRACTION
 	denom	dd	? 
 ends 
 	
-; section '.data' data readable writeable 
-
+section '.data' data readable writeable 
+	frac_delim		db	'---',13,10,0
+	
 section '.bss' readable writeable
+	frac_sum	FRACTION 	?
 	frac_1 		FRACTION	?
 	frac_2 		FRACTION	?
 	
@@ -18,7 +20,7 @@ section '.text' code readable executable
 start:
 	mov		eax, [esp]
 	call	print_eax 
-		
+	
 	mov		esi, frac_1 
 	call	read_hex 
 	mov		ebx, eax 
@@ -43,40 +45,112 @@ start:
 	
 	call	print_delimiter
 	call	print_delimiter
-
 	
+	mov		eax, frac_sum
+	mov		esi, frac_1 
+	mov		edi, frac_2
+	push	eax 
+	push	edi 
+	push	esi
+	call	add_fractions
+	add		esp, 4*3  
+	
+	mov		esi, frac_sum
+	push	esi
+	call	print_fraction
+	add		esp, 4 
 	
 	mov		eax, [esp]
 	call	print_eax 
-	
+		
 	push	0
 	call	[ExitProcess]
 	
 ;===================================
-; add_fractions(frac_addr_1, frac_addr_2)
+; add_fractions(frac_addr_1, frac_addr_2, frac_addr_sum)
 ;
 add_fractions:
 	.frac_addr_1 = 8h
-	.frac_addr_2 = 0ch
-	push	ebp 
-	mov		ebp, esp 
+	.frac_addr_2 = 0ch 
+	.frac_addr_sum = 10h
+	push 	ebp 
+	mov		ebp, esp
 	
 	push	esi
-	push	edi 
-	push	ebx 
-	push	ecx 
+	push	edi
 	push	edx 
+	push	ecx 
+	push	ebx 
+	push	eax 
 	
+	mov		esi, dword [ebp + .frac_addr_1]
+	mov		edi, dword [ebp + .frac_addr_2]
+	mov		ecx, dword [ebp + .frac_addr_sum]	
+			
+	;=================================
+	; Get product of both denominator
+	;================================= 
+	mov		eax, dword [esi + FRACTION.denom]
+	mov		ebx, dword [edi + FRACTION.denom]
+	mul		ebx 
+	mov		ecx, eax 			; ecx = product 
 	
+	;===============================
+	; Get GCD of both denominator
+	;===============================
+	mov		eax, dword [esi + FRACTION.denom]
+	mov		ebx, dword [edi + FRACTION.denom]
+	push	ebx 
+	push	eax
+	call	stein 
+	add		esp, 4*2 			; eax has GCD 
 	
+	;===============================
+	; Get the LCM = product / GCD 
+	;===============================
+	mov		ebx, eax 			; swap eax and ecx
+	mov		eax, ecx 			; eax is not product 		
+	mov		ecx, ebx 			; ecx is GCD to divide 
+	div		ecx 				; eax is now LCM after division
 	
-	pop		edx 
-	pop		ecx 
+	;=========================================
+	; store LCM as the denominator of the sum
+	;=========================================
+	mov		ecx, dword [ebp + .frac_addr_sum]
+	mov		dword [ecx + FRACTION.denom], eax 
+	
+	;=========================================
+	; compute for the numerator of the sum 
+	;=========================================
+	mov		eax, dword [ecx + FRACTION.denom]
+	mov		ebx, dword [esi + FRACTION.denom]
+	div		ebx 
+	mov		ebx, dword [esi + FRACTION.numer]
+	mul		ebx 
+	mov		dword [ecx + FRACTION.numer], eax 
+		
+	mov		eax, dword [ecx + FRACTION.denom]
+	mov		ebx, dword [edi + FRACTION.denom]
+	div		ebx 
+	mov		ebx, dword [edi + FRACTION.numer]
+	mul		ebx 
+			
+	add		eax, dword [ecx + FRACTION.numer]
+	mov		dword [ecx + FRACTION.numer], eax 
+	
+	push	ecx
+	call	reduce_fraction
+	add		esp, 4
+		
+.end_func:
+	pop		eax 
 	pop		ebx 
+	pop		ecx 
+	pop		edx 
 	pop		edi 
-	pop		esi
+	pop		esi 
 	
-	pop		ebp 
+	pop		ebp
 	ret 
 	
 ;===================================
@@ -224,6 +298,11 @@ print_fraction:
 	mov		eax, dword [esi + FRACTION.numer]
 	call	print_eax 
 	
+	push	esi
+	mov		esi, frac_delim
+	call	print_str 
+	pop		esi 
+		
 	mov		eax, dword [esi + FRACTION.denom]
 	call	print_eax 
 	
@@ -232,6 +311,87 @@ print_fraction:
 	pop		esi
 	
 	pop		ebp 
+	ret 
+	
+; ===========================================================
+; stein(a,b)
+;
+; Input:
+;   number a and number b 
+; Output:
+;   eax = Greatest Common Divisor between a & b 
+; Operations:
+;   continuously check a and b if they are odd/even 
+;	if a is even => a = a / 2
+;   if b is even => b = b / 2
+;	if both are odd, a = |a - b| / 2
+;	continue until any a or b is 0, the remainder is the GCD 
+;
+stein:
+	.a = 8h
+	.b = 0ch
+	
+	push	ebp 
+	mov		ebp, esp 
+	
+	push	esi
+	push	edi 
+	push	ecx 
+	push	ebx 
+	
+	mov		esi, dword [ebp + .a]
+	mov		edi, dword [ebp + .b]
+	
+	mov		eax, esi 
+	test 	edi, edi
+	jz 		.end_func
+	
+	mov		eax, edi
+	test	esi, esi
+	jz		.end_func
+	
+	xor 	ebx, ebx
+	
+	mov		ecx, esi
+	not		ecx 
+	and		ecx, 1
+	shr		esi, cl 
+	add		ebx, ecx 
+	
+	mov		ecx, edi
+	not		ecx 
+	and		ecx, 1
+	shr		edi, cl 
+	add		ebx, ecx 
+	
+	test	ebx, ebx
+	jnz		.not_both_odd 
+	
+	cmp		esi, edi 
+	jae		.a_bigger_equal 
+	xchg 	esi, edi 
+	
+.a_bigger_equal:
+	sub		esi, edi 
+	shr		esi, 1 
+	
+.not_both_odd:
+	push	edi
+	push	esi 
+	call	stein 
+	add		esp, 4*2  
+	
+	mov		ecx, ebx 
+	shr 	ecx, 1
+	shl		eax, cl 
+	
+.end_func:
+	pop		ebx 
+	pop		ecx 
+	pop		edi
+	pop		esi 
+	
+	pop		ebp
 	ret 
 	
 	
