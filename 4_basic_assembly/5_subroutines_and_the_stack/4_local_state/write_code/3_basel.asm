@@ -10,9 +10,8 @@ ends
 	
 section '.data' data readable writeable 
 	frac_delim		db	'---',13,10,0
-	
+		
 section '.bss' readable writeable
-	frac_sum	FRACTION 	?
 	frac_1 		FRACTION	?
 	frac_2 		FRACTION	?
 	
@@ -46,19 +45,23 @@ start:
 	call	print_delimiter
 	call	print_delimiter
 	
-	mov		eax, frac_sum
+
 	mov		esi, frac_1 
 	mov		edi, frac_2
-	push	eax 
 	push	edi 
 	push	esi
 	call	add_fractions
-	add		esp, 4*3  
-	
-	mov		esi, frac_sum
-	push	esi
-	call	print_fraction
-	add		esp, 4 
+	add		esp, 4*2
+		
+	mov ebx, dword [eax]
+	mov ecx, dword [eax + 4]
+		
+	mov eax, ebx
+	call    print_eax 
+			
+	mov eax, ecx
+	call    print_eax 
+
 	
 	mov		eax, [esp]
 	call	print_eax 
@@ -67,25 +70,26 @@ start:
 	call	[ExitProcess]
 	
 ;===================================
-; add_fractions(frac_addr_1, frac_addr_2, frac_addr_sum)
+; add_fractions(frac_addr_1, frac_addr_2)
 ;
 add_fractions:
 	.frac_addr_1 = 8h
 	.frac_addr_2 = 0ch 
-	.frac_addr_sum = 10h
 	push 	ebp 
 	mov		ebp, esp
+	sub     esp, sizeof.FRACTION
+	
+	.sum_numer_offset = -8h
+    .sum_denom_offset = -4h
 	
 	push	esi
 	push	edi
 	push	edx 
 	push	ecx 
 	push	ebx 
-	push	eax 
 	
 	mov		esi, dword [ebp + .frac_addr_1]
 	mov		edi, dword [ebp + .frac_addr_2]
-	mov		ecx, dword [ebp + .frac_addr_sum]	
 			
 	;=================================
 	; Get product of both denominator
@@ -116,39 +120,37 @@ add_fractions:
 	;=========================================
 	; store LCM as the denominator of the sum
 	;=========================================
-	mov		ecx, dword [ebp + .frac_addr_sum]
-	mov		dword [ecx + FRACTION.denom], eax 
-	
+	mov dword [ebp + .sum_denom_offset], eax
+		
 	;=========================================
 	; compute for the numerator of the sum 
 	;=========================================
-	mov		eax, dword [ecx + FRACTION.denom]
-	mov		ebx, dword [esi + FRACTION.denom]
-	div		ebx 
-	mov		ebx, dword [esi + FRACTION.numer]
-	mul		ebx 
-	mov		dword [ecx + FRACTION.numer], eax 
-		
-	mov		eax, dword [ecx + FRACTION.denom]
-	mov		ebx, dword [edi + FRACTION.denom]
-	div		ebx 
-	mov		ebx, dword [edi + FRACTION.numer]
-	mul		ebx 
-			
-	add		eax, dword [ecx + FRACTION.numer]
-	mov		dword [ecx + FRACTION.numer], eax 
-	
-	push	ecx
-	call	reduce_fraction
-	add		esp, 4
+	mov	eax, dword [ebp + .sum_denom_offset]
+    mov ebx, dword [esi + FRACTION.denom]
+    div ebx 
+    mov ebx, dword [esi + FRACTION.numer]
+    mul ebx
+    mov dword [ebp + .sum_numer_offset], eax 
+    
+    mov eax, dword [ebp + .sum_denom_offset]
+    mov ebx, dword [edi + FRACTION.denom]
+    div ebx 
+    mov ebx, dword [edi + FRACTION.numer]
+    mul ebx 
+    
+    add eax, dword [ebp + .sum_numer_offset]
+    mov dword [ebp + .sum_numer_offset], eax 
+    
+    lea eax, dword [ebp - sizeof.FRACTION]
 		
 .end_func:
-	pop		eax 
 	pop		ebx 
 	pop		ecx 
 	pop		edx 
 	pop		edi 
 	pop		esi 
+	
+	add esp, sizeof.FRACTION
 	
 	pop		ebp
 	ret 
