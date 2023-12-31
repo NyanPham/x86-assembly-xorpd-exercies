@@ -76,7 +76,6 @@ section '.bss' readable writeable
 	
 section '.text' code readable executable 
 start:
-
 	; initalize the frac_2 to be the 0/1,  
 	; storing the sum of each iteration
 	
@@ -107,29 +106,19 @@ sum_next:
 	; of the local variable for the numerator and denominator 
 	mov		esi, frac_1 
 	mov		edi, frac_2 
+	push	edi				; replace sum into frac_2 
 	push	edi 
 	push	esi
 	call	add_fractions
-	add		esp, 4 * 2
-	
-	
-	; Store the sum (resulted numerator and denominator) back to frac_2
-	mov		esi, frac_2			
-	push	esi
-	mov		edx, dword [eax + 4]
-	push	edx 
-	mov		edx, dword [eax]
-	push	edx 
-	call	create_fraction
 	add		esp, 4 * 3
-	
+		
 	inc		ecx 
 	cmp		ecx, BASEL_MAX 
 	jbe  	sum_next
-	
+		
 	mov		esi, result_is
 	call 	print_str 
-			
+				
 	mov		esi, frac_2
 	push	esi
 	call	print_fraction
@@ -139,16 +128,17 @@ sum_next:
 	call	[ExitProcess]
 	
 ;===================================
-; add_fractions(frac_addr_1, frac_addr_2)
+; add_fractions(frac_addr_1, frac_addr_2, sum_frac_addr)
 ;
-; Input: addresses of both fractions
-; Ouput: eax - address of the local variable (space for numerator and denominator of the sum)
+; Input: addresses of both fractions, and an address of fraction to store the sum
+; Ouput: void, sum_frac_addr filled with the sum of both fractions
 ; Operation: 
 ; 	Get the LCM of both denominators and compute the sum of both numerators based on LCM 
 ; 
 add_fractions:
 	.frac_addr_1 = 8h
 	.frac_addr_2 = 0ch 
+	.sum_frac_addr = 10h 
 	push 	ebp 
 	mov		ebp, esp
 	sub     esp, sizeof.FRACTION
@@ -161,6 +151,7 @@ add_fractions:
 	push	edx 
 	push	ecx 
 	push	ebx 
+	push	eax 
 	
 	mov		esi, dword [ebp + .frac_addr_1]
 	mov		edi, dword [ebp + .frac_addr_2]
@@ -211,13 +202,23 @@ add_fractions:
     div 	ebx 
     mov 	ebx, dword [edi + FRACTION.numer]
     mul 	ebx 
-    
+		
     add 	eax, dword [ebp + .sum_numer_offset]
     mov 	dword [ebp + .sum_numer_offset], eax 
-    
-    lea 	eax, dword [ebp - sizeof.FRACTION]
+	
+	mov		edi, dword [ebp - .sum_frac_addr] 
+	mov		eax, dword [ebp + .sum_numer_offset]
+	mov		dword [edi + FRACTION.numer], eax
 		
+	mov		eax, dword [ebp + .sum_denom_offset]
+	mov		dword [edi + FRACTION.denom], eax
+	
+	push	edi
+	call	reduce_fraction
+	add		esp, 4
+	
 .end_func:
+	pop		eax 
 	pop		ebx 
 	pop		ecx 
 	pop		edx 

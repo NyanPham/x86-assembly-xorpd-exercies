@@ -50,7 +50,7 @@ start:
 	
 	mov		ebx, 10d
 	mov		ecx, 0 			; index in dec_num_str 
-	
+		
 compute_dec_digit:
 	xor		edx, edx 
 	div		ebx
