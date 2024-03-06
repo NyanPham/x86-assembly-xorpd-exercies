@@ -76,6 +76,9 @@ section '.bss' readable writeable
 	
 section '.text' code readable executable 
 start:
+	mov		eax, [esp]
+	call 	print_eax 
+
 	; initalize the frac_2 to be the 0/1,  
 	; storing the sum of each iteration
 	
@@ -123,6 +126,9 @@ sum_next:
 	push	esi
 	call	print_fraction
 	add		esp, 4
+	
+	mov		eax, [esp]
+	call 	print_eax 
 	
 	push	0
 	call	[ExitProcess]
@@ -378,10 +384,82 @@ reduce_fraction:
 	
 	pop		ebp 
 	ret 
-	
-;===================================
-; print_fraction(frac_addr)
+		
+;==========================================
+; hex_to_dec_ascii(hex, str_addr, str_size)
 ;
+hex_to_dec_ascii:
+	.hex = 8h
+	.str_addr = 0ch
+	.str_size = 10h
+	push	ebp 
+	mov		ebp, esp 	
+		
+	push	esi 
+	push	edi 
+	push	edx 
+	push	ebx 
+	push	ecx 
+	push	eax 
+	
+	mov		esi, dword [ebp + .str_addr]
+	mov		edi, dword [ebp + .str_size]
+	mov		eax, dword [ebp + .hex]
+	mov		ebx, 10d 
+	mov		ecx, 0
+	
+.compute_dec_digit:
+	xor 	edx, edx 
+	div		ebx 
+	add		edx, 30h 
+	
+	mov		esi, dword [ebp + .str_addr]
+	lea		esi, [esi + ecx] 	
+	mov		byte [esi], dl  
+	
+	call	print_str 
+	
+	inc 	ecx	
+	cmp		ecx, edi 
+	jz 		.done 
+	test 	eax, eax 
+	jnz		.compute_dec_digit
+		
+.done:
+; .reverse_dec_num_str:
+	; mov		edx, ecx 
+	; dec		edx 
+	; shr 	ecx, 1
+	; xor 	ebx, ebx 
+	; mov		esi, dword [ebp + .str_addr]
+		
+; .reverse_next_char:
+	; mov		al, byte [esi + ebx]
+	; mov		ah, byte [esi + edx] 
+	; mov		byte [esi + ebx], ah
+	; mov		byte [esi + edx], al  
+	; inc		ebx 
+	; dec 	edx 
+	; clc 	
+	; dec 	ecx 
+	; jnz 	.reverse_next_char
+; .reverse_done:
+	; mov		ecx, dword [ebp + .str_size]
+	; mov		byte [esi + ecx], 0 
+	
+	pop		eax 
+	pop		ecx 
+	pop		ebx 
+	pop		edx 
+	pop		edi
+	pop		esi 
+		
+	pop		ebp
+	ret 
+		
+;==========================================
+; print_fraction(frac_addr)
+; 	
 print_fraction: 
 	.frac_addr = 8h 
 	push	ebp 
@@ -389,11 +467,22 @@ print_fraction:
 	
 	push	esi
 	push	eax 
-	
+		
 	jmp     .print_eax_after_data
+	.numer		 	 db			'Hello world',0
+	.denom		 	 db			40h  dup (?)
 	.print_eax_fmt   db          "%x/%x",10,13,0
 .print_eax_after_data:
-			
+	
+	; mov		eax, 40h
+	; push	eax 
+	; mov		eax, .numer 
+	; push	eax 
+	; mov		eax, dword [esi + FRACTION.numer]
+	; push	eax 
+	; call	hex_to_dec_ascii
+	; add		esp, 4*3 
+				
 	mov		esi, dword [ebp + .frac_addr]
 	mov		eax, dword [esi + FRACTION.denom]
 	push	eax 
