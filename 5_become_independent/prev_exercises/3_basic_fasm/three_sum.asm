@@ -6,7 +6,6 @@ entry start
 	
 include 'win32a.inc'
 
-
 BUFFER_MAX = 20h
 NUMS_LEN = 3h
 	
@@ -21,12 +20,12 @@ section '.bss' readable writeable
 	input_buffer 			dd	BUFFER_MAX 	dup (?) 
 
 section '.text' code readable executable
-
+	
 start:
 	push	STD_INPUT_HANDLE 
 	call	[GetStdHandle]
 	mov		[input_handle], eax 
-		
+	
 	push	NUMS_LEN
 	push	numbers
 	call	get_number_inputs
@@ -145,7 +144,7 @@ get_number_inputs:
 	pop		ebp
 	ret 
 	
-
+	
 
 ; str_to_num(str_addr)
 str_to_num:
