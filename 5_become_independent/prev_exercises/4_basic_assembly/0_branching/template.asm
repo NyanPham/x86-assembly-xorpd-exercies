@@ -1,4 +1,3 @@
-; 0.0 Write a program that takes the value n as input, and finds the sum of all the odd numbers between 1 and 2n+1, inclusive.
 
 format PE console 
 entry start 
@@ -9,8 +8,6 @@ INPUT_BUFFER_MAX_LEN = 20h
 
 section '.data' data readable writeable 
 	enter_number	db	'Please enter a number: ',0
-	odd_sum_is		db	'Input: %d',13,10
-					db	'The sum of all odd numbers between 1 and 2x%d+1 is: %d',13,10,0
 		
 section '.bss' readable writeable
 	input_buffer 	dd	INPUT_BUFFER_MAX_LEN 	dup	(?)
@@ -22,90 +19,19 @@ section '.bss' readable writeable
 section '.text' code readable executable 
 
 start:	
-	push	STD_INPUT_HANDLE
-	call	[GetStdHandle]
-	mov		dword [input_handle], eax 
-	
-	call	get_num
-	mov		dword [number], eax 
-	
-	push	number
-	call	sum_odd
-	add		esp, 4
-		
-	push	eax 
-	push	dword [number]
-	push	dword [number]
-	push	odd_sum_is 
-	call	[printf]
-	add		esp, 4*4
 	
 	push	0
 	call	[ExitProcess]
 	
-; sum_odd(num_addr) 
-sum_odd:	
-	.num_addr = 8h
-	
-	.local_boundary = 4h
-	
-	push	ebp
-	mov		ebp, esp 
-	
-	sub		esp, .local_boundary
-	
-	push	ecx 
-	push	esi
-	push	ebx 
-	push	edx 
-	push	edi
-			
-	mov		esi, dword [ebp + .num_addr]
-	
-	mov		eax, dword [esi]
-	shl 	eax,1
-	inc		eax 
-	mov		dword [ebp - .local_boundary], eax 
-	
-	mov 	ecx, 1
-		
-	mov		ebx, 2h
-	xor		edi, edi 
-		
-.add_loop:
-	xor		edx, edx 
-	mov		eax, ecx 
-	div		ebx 
-	
-	cmp		edx, 0
-	je 		.not_odd
-	
-	add		edi, ecx 
-		
-.not_odd:	
-	inc 	ecx 
-	cmp		ecx, dword [ebp - .local_boundary]
-	jbe		.add_loop 
-	
-	mov		eax, edi
-.end_func:
-	pop		edi
-	pop		edx 
-	pop		ebx 
-	pop		esi 
-	pop		ecx 
-		
-	add		esp, .local_boundary
-	
-	pop		ebp
-	ret 
-	
-	
+
+; get_num(prompt_addr)
 get_num:
+	.prompt_addr = 8h
+	
 	push	ebp 
 	mov		ebp, esp 
-	
-	push	enter_number
+		
+	push	dword [ebp + .prompt_addr]
 	call	[printf]
 	add		esp, 4 
 	
