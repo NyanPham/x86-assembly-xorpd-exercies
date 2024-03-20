@@ -3,12 +3,14 @@ format PE console
 entry start 
 
 include 'win32a.inc'
-
+	
 INPUT_BUFFER_MAX_LEN = 20h
 
 section '.data' data readable writeable 
 	enter_number	db	'Please enter a number: ',0
-		
+	
+	input_value		db	'Test value: %d',13,10,0
+	
 section '.bss' readable writeable
 	input_buffer 	dd	INPUT_BUFFER_MAX_LEN 	dup	(?)
 	bytes_read		dd 	?
@@ -19,6 +21,10 @@ section '.bss' readable writeable
 section '.text' code readable executable 
 
 start:	
+	push	STD_INPUT_HANDLE
+	call	[GetStdHandle]
+	mov		dword [input_handle], eax 
+	
 	
 	push	0
 	call	[ExitProcess]
