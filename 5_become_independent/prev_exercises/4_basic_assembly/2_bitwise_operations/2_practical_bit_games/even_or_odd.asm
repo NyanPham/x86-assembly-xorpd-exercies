@@ -1,3 +1,6 @@
+; 0.0   Write a program that takes a number x as input, and returns:
+; - 0 if x is even.
+; - 1 if x is odd. 
 
 format PE console 
 entry start 
@@ -8,13 +11,12 @@ INPUT_BUFFER_MAX_LEN = 20h
 
 section '.data' data readable writeable 
 	enter_number	db	'Please enter a number: ',0
-	input_value		db	'Test value: %d',13,10,0
+	is_odd			db	'Is number %d odd: %d',13,10,0
 	
 section '.bss' readable writeable
 	input_buffer 	dd	INPUT_BUFFER_MAX_LEN 	dup	(?)
 	bytes_read		dd 	?
 	input_handle	dd	? 
-	
 	number 			dd	?
 	
 section '.text' code readable executable 
@@ -24,10 +26,45 @@ start:
 	call	[GetStdHandle]
 	mov		dword [input_handle], eax 
 	
+	push	enter_number
+	call	get_num
+	add		esp, 4 
+	
+	mov		dword [number], eax 
+	
+	push	dword [number]
+	call	odd_or_even
+	add		esp, 4 
+	
+	push	eax 
+	push	dword [number]
+	push	is_odd
+	call	[printf]
+	add		esp, 4*3
 	
 	push	0
 	call	[ExitProcess]
+
+; odd_or_even(num)
+odd_or_even:
+	.num = 8h
 	
+	push 	ebp
+	mov		ebp, esp
+	
+	mov		eax, dword [ebp + .num]
+	shr 	eax, 1
+	jnc		.even 
+.odd:
+	mov		eax, 1
+	jmp 	.end_func
+.even:	
+	mov		eax, 0
+	
+.end_func:	
+	pop		ebp 
+	ret 
+
 ; get_num(prompt_addr)
 get_num:
 	.prompt_addr = 8h
