@@ -49,7 +49,6 @@ ends
 
 section '.data' data readable writeable 
 	enter_number	db	'Please enter a number: ',0
-	input_value		db	'Test value: %d',13,10,0
 	
 	enter_x 		db 	'X coordinate: ',0
 	enter_y 		db 	'Y coordinate: ',0
