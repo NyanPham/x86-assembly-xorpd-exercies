@@ -93,8 +93,20 @@
           ; valid paths possible from S to E. 
 
           ; Add a piece of code to print this number.
-		  
-
+;
+;
+;
+; 		   Index	0	1	2	3	4
+;			
+;			0		1	1	1	1	1
+;			1		1	2	3	4	5
+;			2		1	3	6	10	15
+;			3		1	4	10	20	35
+;			4		1	5	15	35	70
+;
+;
+;			A num_paths of size 5*5, should have the result of 70
+; 
 
 format PE console 
 entry start 
@@ -106,40 +118,102 @@ INPUT_BUFFER_MAX_LEN = 20h
 MAP_SIZE = 5h
 	
 section '.data' data readable writeable 
-	enter_number	db	'Please enter a number: ',0
 	cell_value		db 	'(%d, %d): %d',13,10,0
-	input_value		db	'Test value: %d',13,10,0
-		
+	computing_cell	db	'Computing cell values...',13,10,0
+	result_is 		db 	'The num paths from S to E is: %d',13,10,0
+	line_brk		db	'',13,10,0
+	
 section '.bss' readable writeable
-	input_buffer 	dd	INPUT_BUFFER_MAX_LEN 	dup	(?)
-	bytes_read		dd 	?
-	input_handle	dd	? 
-	
 	num_paths 		dd	MAP_SIZE*MAP_SIZE 		dup (?) 
-	
-	PATH_LENTH = ($ - num_paths) / 4
 	
 section '.text' code readable executable 
 
 start:	
-	push	STD_INPUT_HANDLE
-	call	[GetStdHandle]
-	mov		dword [input_handle], eax 
-		
+	push 	line_brk
+	call	[printf]
+	add		esp, 4
+
 	push	MAP_SIZE 
 	push	MAP_SIZE 
 	push	num_paths
 	call	initialize_num_paths
 	add		esp, 4*3
-		
+	
+	push	computing_cell
+	call	[printf] 
+	add 	esp, 4
+	
 	push	MAP_SIZE 
 	push	MAP_SIZE 
 	push	num_paths
-	call	print_map
+	call	print_num_paths
 	add		esp, 4*3
-		
+	
+	push 	line_brk
+	call	[printf]
+	add		esp, 4
+	
+	push	MAP_SIZE
+	push	MAP_SIZE
+	push	MAP_SIZE-1
+	push	MAP_SIZE-1 
+	push	num_paths
+	call	get_num_paths_cell_value
+	add 	esp, 4*5
+	
+	push	eax 
+	push 	result_is
+	call	[printf]
+	add		esp, 4*2
+	
 	push	0
 	call	[ExitProcess]
+
+; get_num_paths_cell_value(num_paths_addr, row_index, column_index, width, height)
+get_num_paths_cell_value:
+	.num_paths_addr = 8h
+	.row_index = 0ch
+	.column_index = 10h
+	.width = 14h
+	.height = 18h
+	
+	push	ebp
+	mov		ebp, esp
+	
+	push	ebx
+	push	ecx 
+	push	edx 
+	push	esi
+	
+	mov 	esi, dword [ebp + .num_paths_addr]
+	mov		ebx, dword [ebp + .row_index]
+	mov		ecx, dword [ebp + .column_index]
+	
+	cmp		ebx, dword [ebp + .height] 
+	jge 	.invalid_index
+	
+	cmp		ecx, dword [ebp + .width]
+	jge		.invalid_index 
+	
+	mov		eax, dword [ebp + .width]
+	mul		ebx 
+	add 	eax, ecx 
+	mov		edx, eax 
+	mov		eax, dword [esi + edx*4]
+	jmp		.end_func
+	
+.invalid_index:
+	mov		eax, -1 
+	
+.end_func:
+	pop		esi
+	pop		edx 
+	pop		ecx 
+	pop		ebx 
+
+	pop		ebp
+	ret 
+		
 	
 ; initialize_num_paths(num_paths_addr, width, height) 
 initialize_num_paths:
@@ -151,7 +225,7 @@ initialize_num_paths:
 	mov		ebp, esp
 	
 	pusha 
-		
+	
 	mov		esi, dword [ebp + .num_paths_addr]
 	
 	xor		ebx, ebx
@@ -159,13 +233,68 @@ initialize_num_paths:
 	
 .init_next_row:
 	xor		ecx, ecx 
-
+	
 .init_next_cell:
 	mov		eax, dword [ebp + .width]
 	mul		ebx
 	add		eax, ecx 
+	mov		edi, eax 						; edi = index of current cell
+	
+	;===================================================
+	; If the cell is in the top row the leftmost column
+	;===================================================
+	xor		eax, eax 
+	
+	test	ebx, ebx
+	jnz 	.check_if_leftmost_col
+	mov		eax, 1
+	jmp 	.set_cell_value
+	
+.check_if_leftmost_col:
+	test	ecx, ecx
+	jnz		.compute_path
+	mov		eax, 1 
+	jmp 	.set_cell_value
+		
+.compute_path:
+	;======================================================
+	; The cell is neither in the top row or leftmost column
+	; Compute the path with forumula:
+	; num_paths(i,j) <-- num_paths(i-1,j) + num_paths(i,j-1)
+	;======================================================
+	
+	sub		esp, 4						; local_sum
+	
+	dec 	ebx							; i - 1
+	mov		eax, dword [ebp + .width]
+	mul		ebx
+	add		eax, ecx
+	mov		edi, eax 					; edi = index of (i-1, j)
+	mov		eax, dword [esi + edi*4]
+	mov		dword [ebp - 4], eax 
+	
+	inc		ebx							; i restored
+	dec		ecx							; j - 1
+			
+	mov		eax, dword [ebp + .width]
+	mul		ebx
+	add		eax, ecx
+	mov		edi, eax 					; edi = index of (i, j - 1)
+	mov		eax, dword [esi + edi*4]
+	add 	eax, dword [ebp - 4]	
+	mov		dword [ebp - 4], eax		; local_sum = num_paths(i-1,j) + num_paths(i,j-1)
+	
+	inc		ecx							; j restored
+	mov		eax, dword [ebp + .width]
+	mul		ebx 
+	add 	eax, ecx 
 	mov		edi, eax 
-	mov		dword [esi + edi*4], 0 
+	mov		eax, dword [ebp - 4]
+	
+	add		esp, 4 
+	
+.set_cell_value:
+	mov		dword [esi + edi*4], eax
 	
 	inc		ecx 
 	cmp		ecx, dword [ebp + .width]
@@ -180,12 +309,12 @@ initialize_num_paths:
 	pop		ebp
 	ret 
 	
-; print_map(num_paths_addr, width, height) 
-print_map:
+; print_num_paths(num_paths_addr, width, height) 
+print_num_paths:
 	.num_paths_addr = 8h
 	.width = 0ch
 	.height = 10h
-	
+		
 	push	ebp
 	mov		ebp, esp
 	pusha 
@@ -228,85 +357,14 @@ print_map:
 	pop		ebp
 	ret 
 
-; get_num(prompt_addr)
-get_num:
-	.prompt_addr = 8h
-	
-	push	ebp 
-	mov		ebp, esp 
-		
-	push	dword [ebp + .prompt_addr]
-	call	[printf]
-	add		esp, 4 
-	
-	push	INPUT_BUFFER_MAX_LEN
-	push	bytes_read
-	push	input_buffer 
-	call	get_line
-	add		esp, 4*3
-	
-	push	input_buffer 
-	call	str_to_dec
-	add		esp, 4
-	
-	pop		ebp
-	ret 
-
-; get_line(input_buffer, bytes_read, bytes_to_read)
-get_line:
-	.input_buffer = 8h
-	.bytes_read = 0ch
-	.bytes_to_read = 10h
-	
-	push	ebp 
-	mov		ebp, esp
-	
-	push	ecx 
-	push	esi
-	
-	mov		ecx, dword [ebp + .bytes_read]
-	mov		esi, dword [ebp + .input_buffer]
-	
-	push	0
-	push	ecx 
-	push	dword [ebp + .bytes_to_read]
-	push	esi 
-	push	dword [input_handle]
-	call	[ReadFile]
-	
-	pop		esi 
-	pop		ecx 
-	
-	pop		ebp 
-	ret 
-	
-; str_to_dec(str_addr)
-str_to_dec:
-	.str_addr = 8h 
-	
-	push	ebp
-	mov		ebp, esp 
-	
-	push	10
-	push	0
-	push	dword [ebp + .str_addr]
-	call 	[strtoul]
-	add		esp, 4*3 
-	
-	pop		ebp
-	ret 
-
 section '.idata' data import readable 
 
 library kernel32,'kernel32.dll',\
 		msvcrt,'msvcrt.dll'
 		
 import	kernel32,\
-		ReadFile,'ReadFile',\
-		GetStdHandle,'GetStdHandle',\
 		ExitProcess,'ExitProcess'
 		
 import	msvcrt,\
-		printf,'printf',\
-		strtoul,'strtoul'
+		printf,'printf'
 
