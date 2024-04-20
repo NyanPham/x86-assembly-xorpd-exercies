@@ -30,7 +30,7 @@ ends
 section '.data' data readable writeable 
 	enter_string			db	'Please enter a string: ',0
 	result_is_palindrome	db	'%s is a palindrome.',13,10,0
-	result_not_palindrome	db	'%s is not a palindrome.',13,10,0
+	result_not_palindrome	db	'"%s" is not a palindrome.',13,10,0
 	
 section '.bss' readable writeable
 	input_handle	dd	? 
@@ -71,7 +71,6 @@ start:
 	call	[printf]
 	add		esp, 4*2 
 .end_check:
-
 		
 	push	0
 	call	[ExitProcess]
