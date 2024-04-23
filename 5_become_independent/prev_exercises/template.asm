@@ -51,7 +51,7 @@ get_num:
 	
 	pop		ebp
 	ret 
-
+	
 ; get_line(input_buffer, bytes_read, bytes_to_read)
 get_line:
 	.input_buffer = 8h
@@ -61,8 +61,7 @@ get_line:
 	push	ebp 
 	mov		ebp, esp
 	
-	push	ecx 
-	push	esi
+	pusha
 	
 	mov		ecx, dword [ebp + .bytes_read]
 	mov		esi, dword [ebp + .input_buffer]
@@ -74,8 +73,20 @@ get_line:
 	push	dword [input_handle]
 	call	[ReadFile]
 	
-	pop		esi 
-	pop		ecx 
+	mov		ebx, dword [ebp + .bytes_read]
+	
+	mov		eax, dword [ebx]
+	mov		byte [esi + eax], 0
+	dec		eax 
+	mov		byte [esi + eax], 0
+	dec		eax
+	mov		byte [esi + eax], 0
+	inc 	eax 
+
+	mov		dword [ebx], eax 
+
+.end_func:
+	popa 
 	
 	pop		ebp 
 	ret 
