@@ -116,34 +116,24 @@ draw_dword_pic:
 	xor 	esi, esi 
 	mov		ebx, dword [ebp + .num]
 	
-	xor		eax, eax
 	mov		ecx, 16d
 	mov		edx, 4
 .fill_buffer_loop:
-	clc 
-	shl		ebx, 1
-	jnc		.shift_bit_2
-	inc		eax 
-	shl		eax, 1 
-	
-.shift_bit_2:
-	clc		
+	xor 	eax, eax 
 	shl		ebx, 1 
-	jnc		.done_shift
-	inc		eax 
+	rcl		al, 1
+	shl		ebx, 1 
+	rcl		al, 1
 
 .done_shift:
 	; eax has the upper 2 bits of the number, value 0 -> 3 
-	
 	push	eax
 	call	num_to_special
 	add		esp, 4
-	
+		
 	; Store eax into the current cell
 	mov		byte [edi + esi], al
-		
-	; Reset eax for the next cell
-	xor		eax, eax 
+
 	inc		esi
 	
 	; If edx == 0, we complete a row of 4 cells.
