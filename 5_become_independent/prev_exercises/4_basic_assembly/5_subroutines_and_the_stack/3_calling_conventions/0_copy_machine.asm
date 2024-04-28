@@ -41,13 +41,18 @@ start:
 
     ; *** FILL IN YOUR CODE HERE ***
     ;
-    ; call  copy_data
+	push  	SRC_DATA_LEN
+	push	src_data
+	push	dest_data
+    call  	copy_data
+	add		esp, 4*3
     ;
     ; ******************************
 
     ; Print dest_data to console:
-    mov     esi,dest_data
-    call    print_str
+    push	dest_data 
+	call 	[printf]
+	add		esp, 4
 
     ; Exit the process:
 	push	0
@@ -58,7 +63,7 @@ start:
 ; copy_data(dest,src,length)
 ;
 ; Calling convention: 
-;   ?
+;   Stack-based
 ; Operation:
 ;   Copy a data buffer.
 ; Input:
@@ -67,6 +72,13 @@ start:
 ;   length  -- amount of data to copy (In bytes).
 ;
 copy_data:
+	.dest = 8h
+	.src = 0ch
+	.len = 10h
+
+	push	ebp
+	mov		ebp, esp
+	
     push    esi     ; Keep registers on stack.
     push    edi
     push    ecx
@@ -75,15 +87,27 @@ copy_data:
     ; will turn into 'mov esi,dword [esp + 10h]'.
 
     ; Think: Why do we have to add 0ch here?
-    mov     edi,dword [esp+4+0ch]   ; dest
-    mov     esi,dword [esp+8+0ch]   ; src
-    mov     ecx,dword [esp+0ch+0ch] ; length
-
+    mov     edi,dword [ebp + .dest]   ; dest
+    mov     esi,dword [ebp + .src]   ; src
+    mov     ecx,dword [ebp + .len] ; length
+		
     rep     movsb   ; Copy data.
 
+.end_func:
     pop     ecx     ; Restore registers from stack.
     pop     edi
     pop     esi
+	
+	pop		ebp
     ret
 
-include 'training.inc'
+section '.idata' data import readable 
+
+library kernel32,'kernel32.dll',\
+		msvcrt,'msvcrt.dll'
+		
+import	kernel32,\
+		ExitProcess,'ExitProcess'
+		
+import	msvcrt,\
+		printf,'printf'
