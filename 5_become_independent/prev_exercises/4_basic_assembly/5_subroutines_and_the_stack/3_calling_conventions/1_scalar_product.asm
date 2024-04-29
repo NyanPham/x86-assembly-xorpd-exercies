@@ -48,21 +48,24 @@ ends
 section '.data' data readable writeable
     vec1            VEC     5,-4
     vec2            VEC     0c3h,-45h
-    scalar_result   db  'Scalar product result: ',0
+    scalar_result   db  	'Scalar product result: %d',13,10,0
+	
+	value			db		'%p',13,10,0
 ; ===============================================
 section '.text' code readable executable
-
+	
 start:
     ; Invoke scalar product of vec1 and vec2:
     push    vec1
     push    vec2
     call    scalar_product
-
+	
     ; Print result to the console:
-    mov     esi,scalar_result
-    call    print_str
-    call    print_eax
-
+	push	eax
+	push	scalar_result
+	call	[printf]
+	add		esp, 4*2
+		
     ; Exit the process:
 	push	0
 	call	[ExitProcess]
@@ -76,11 +79,51 @@ start:
 ; Output:
 ;   (v1.x * v2.x) + (v1.y * v2.y)
 ; Calling Covention:
-;   ?
+;   STDCALL
 ;
+	
+scalar_product:
+	.v2 = 8h
+	.v1 = 0ch
+		
+	push	ebp
+	mov		ebp, esp
+	
+	push	esi
+	push	edi
+	push	ebx 
+	
+	mov		esi, dword [ebp + .v1]
+	mov		edi, dword [ebp + .v2]
+		
+	xor		edx, edx 
+	
+	mov		eax, dword [esi + VEC.x]
+	mul		dword [edi + VEC.x]
+	mov		ebx, eax 
+	
+	xor		edx, edx 
+	
+	mov		eax, dword [esi + VEC.y]
+	mul		dword [edi + VEC.y]
+	add		eax, ebx
+		
+.end_func:
+	pop		ebx 
+	pop		edi
+	pop		esi
 
-; **** Fill in this function ****
-; scalar_product:
+	pop		ebp 
+	ret 	4*2
 
+section '.idata' data import readable 
 
-include 'training.inc'
+library kernel32,'kernel32.dll',\
+		msvcrt,'msvcrt.dll'
+		
+import	kernel32,\
+		ExitProcess,'ExitProcess'
+		
+import	msvcrt,\
+		printf,'printf'
+
