@@ -50,7 +50,6 @@ section '.data' data readable writeable
     vec2            VEC     0c3h,-45h
     scalar_result   db  	'Scalar product result: %d',13,10,0
 	
-	value			db		'%p',13,10,0
 ; ===============================================
 section '.text' code readable executable
 	
