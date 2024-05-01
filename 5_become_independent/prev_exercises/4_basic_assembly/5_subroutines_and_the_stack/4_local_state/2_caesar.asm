@@ -82,7 +82,7 @@ start:
 	push	encoded_string
 	call	[printf]
 	add		esp, 4*2
-	
+
 	push	0
 	call	[ExitProcess]
 	
@@ -101,10 +101,10 @@ rot13_string:
 	movzx	eax, byte [esi + ebx]
 	cmp		eax, 0
 	jz		.end_func
-		
+	
 	push	eax 
 	call	rot13_char
-	add		esp, 4 
+	add		esp, 4		
 	
 	mov		byte [esi + ebx], al
 	inc		ebx 
@@ -122,36 +122,56 @@ rot13_char:
 	push	ebp 
 	mov		ebp, esp 
 	
-	xor		eax, eax 
-	mov		al, byte [esp + .char]
+	push	ebx 			;	ebx => The offset of the latin letter to add back
+	push	ecx 			;	ecx => Last bound offset (z or Z)
+	
+	mov		eax, dword [ebp + .char]
 
+	xor		ebx, ebx 
+	xor		ecx, ecx 
+	;================================================
+	; Check if the letter is uppercase or lowercase
+	;================================================
 	cmp		eax, 41h
 	jl		.end_func
 	cmp		eax, 5ah
 	jg		.check_lower_case
-	;		Is Uppercase
-	add		eax, 0dh
-	cmp		eax, 5ah
-	jle		.end_func
-	sub		eax, 5ah
-	add		eax, 40h
-	jmp		.end_func
+	
+	;=====================================================
+	; Is Uppercase: 
+	; 	set the first char offset to be 41h	(A)
+	;	set the last bound offset to be 5ah (Z)
+	;=====================================================
+	mov		ebx, 41h
+	mov		ecx, 5ah
+	jmp		.transform
 	
 .check_lower_case:
 	cmp		eax, 61h
 	jl		.end_func
 	cmp		eax, 7ah
 	jg		.end_func
-	;		Is Lowercase
+	
+	;=====================================================
+	; Is Uppercase: 
+	; 	set the first char offset to be 61h	(A)
+	;	set the last bound offset to be 7ah (Z)
+	;=====================================================
+	mov		ebx, 61h
+	mov		ecx, 7ah
+	
+.transform:
 	add		eax, 0dh
-	cmp		eax, 7ah
+	cmp		eax, ecx 
 	jle		.end_func
-	sub		eax, 7ah
-	add		eax, 60h
-	jmp		.end_func
+	sub		eax, ecx
+	add		eax, ebx
+	dec		eax 
 	
 .end_func:
-
+	pop		ecx
+	pop		ebx 
+	
 	pop		ebp
 	ret 
 	
