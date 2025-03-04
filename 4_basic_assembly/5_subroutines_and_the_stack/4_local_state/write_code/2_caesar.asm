@@ -145,54 +145,179 @@ rot13:
 	cmp		esi, 5ah
 	jbe		.upper_case 
 	cmp		esi, 61h
-	jae		.lower_case 
-	jmp		.rot_done
+	jae		.lower_case 2.  Caesar
+    
+    The ROT13 transformation changes a latin letter into another latin letter in
+    the following method:
+
+    We order all the latin letters 'a'-'z' on a circle. A letter is transformed
+    into the letter which could be found 13 locations clockwise.
+
+    Example:
+      ROT13(a) = n
+      ROT13(b) = o
+      ROT13(p) = c
+      ROT13(c) = p
+
+    Note that the ROT13 transform is its own inverse. That means:
+    ROT13(ROT13(x)) = x for every letter x.
+    We will use this transform to encode and decode text made of latin letters.
+
+    Example:
+      'Somebody set up us the bomb.' -> 'Fbzrobql frg hc hf gur obzo.'
+      'Fbzrobql frg hc hf gur obzo.' -> 'Somebody set up us the bomb.'
+
+    0.  Write a function that implements the ROT13 transform, and extends it a
+        bit: The function takes a character as input. If the character is a
+        latin letter, it is transformed. (13 places clockwise). If the character
+        is not a latin letter, it is left unchanged.
+
+        Capital latin letters will result in capital letters after the
+        transform. Minuscule letters will result in minuscule letters.
+
+        The function finally returns the transformed character.
+
+    1.  Write a function that transforms a string. The function takes a null
+        terminated string as an argument, and transforms every letter in the
+        string, using the previously written function.
+
+    2.  Write a program that takes a string from the user, and prints back to
+        the user the transformed string.
+
+    3.  Tbbq wbo! Jryy qbar!
+
+format PE console
+entry start
+
+include 'win32a.inc' 
+
+MAX_STR_LEN = 0x40
+
+section '.data' data readable writeable
+	enter_str	db	'Please enter a string: ',0
+	
+section '.bss' readable writeable
+	user_str		db		MAX_STR_LEN 	dup 	(?)
+	user_str_len	dd		?
+
+section '.text' code readable executable
+
+start: 
+	mov		esi, enter_str
+	call	print_str
+	
+	mov		edi, user_str
+	mov		ecx, MAX_STR_LEN
+	call	read_line
 		
-.upper_case:
-	add		eax, 0dh 			; char code + 13 decimal
-	cmp		eax, 5ah			; are the circle out of Z?
-	jbe		.rot_done 			; no, return 
-	sub		eax, 5ah 			; yes, subtract for offset 
-	add		eax, 40h 			; add to the begging of circle: A char 
-	jmp		.rot_done	
-			
-.lower_case:
-	add		eax, 0dh
-	cmp		eax, 7ah 
-	jbe		.rot_done 
-	sub		eax, 7ah 
-	add		eax, 60h 
-	jmp		.rot_done 	
+	mov     edi, user_str
+    mov     ecx, MAX_STR_LEN
+    xor     al,al
+    repnz 	scasb
 	
-.rot_done:
-	add		esp, .out_char_off
+    neg     ecx
+    add     ecx, MAX_STR_LEN
+    dec     ecx
 	
-	pop		edi 
+    mov     dword [user_str_len], ecx
+
+	push	dword [user_str_len]
+	push	user_str
+	call	encode_decode_str
+	add		esp, 4*2
+	
+	mov		esi, user_str
+	call	print_str
+	
+    ; Exit the process:
+	push	0
+	call	[ExitProcess]
+
+;=====================================
+; encode_decode_str(str_addr, str_len)
+;=====================================
+encode_decode_str:
+	.str_addr = 0x8
+	.str_len = 0xc 
+	
+	push 	ebp
+	mov		ebp, esp
+	
+	push	esi
+	push	eax
+	push	ebx
+	push	ecx
+	
+	mov		esi, dword [ebp + .str_addr]
+	mov		ecx, dword [ebp + .str_len]
+	jecxz 	.done
+	xor		eax, eax
+	xor		ebx, ebx
+.next_char:
+	mov		al, byte [esi + ebx]
+	
+	push	eax
+	call	encode_decode_char
+	add		esp, 4
+	
+	mov		byte [esi + ebx], al
+	
+	inc		ebx
+	dec		ecx 
+	jnz		.next_char
+	
+.done:
+	pop		ecx
+	pop		ebx
+	pop		eax
 	pop		esi
-	
+
+	mov		esp, ebp
 	pop		ebp 
+	ret
+
+;==================================
+; encode_decode_char(char)
+;==================================
+encode_decode_char:
+	.char = 0x8
+	
+	push	ebp
+	mov		ebp, esp
+	
+	push	ecx
+	
+	mov		eax, dword [ebp + .char]
+	cmp		al, 0x41
+	jb		.epilogue
+	cmp		al, 0x7a
+	ja		.epilogue
+	cmp		al, 0x5a
+	jbe		.is_upper 
+	cmp		al, 0x61
+	jae		.is_lower
+	jmp		.epilogue
+.is_upper:
+	add		eax, 0xd
+	cmp		al, 0x5a
+	jbe		.epilogue
+	sub		al, 0x5a
+	add		al, 0x40
+	
+	jmp		.epilogue
+.is_lower:
+	add		eax, 0xd
+	cmp		al, 0x7a
+	jbe		.epilogue
+	sub		al, 0x7a
+	add		al, 0x60
+	
+.epilogue:
+	pop		ecx
+
+	mov		esp, ebp
+	pop		ebp
 	ret 
 
 
 include 'training.inc'
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

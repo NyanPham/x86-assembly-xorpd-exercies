@@ -29,101 +29,87 @@
 format PE console
 entry start
 
-include 'win32a.inc' 
+include 'win32a.inc'
 
 struct PNT 
-	x 	dd 	?
-	y	dd 	? 
-ends 
-		
-struct rectangle 
-	top_left 	PNT 	?
-	bottom_right 	PNT 	? 
-ends 
-			
-; ===============================================
-section '.bss' readable writeable
-    rectangle_1 	rectangle 	?
-	rectangle_2 	rectangle 	?
-		
-; This is the text section:
-; ===============================================
+	x	dd	?
+	y	dd	?
+ends
+
+struct RECT
+	a	PNT		?
+	b	PNT		?
+ends
+
+section '.bss' readable writable
+	rect1		RECT 	?
+	rect2		RECT 	?
+
 section '.text' code readable executable
-	
-start:
+
+start:	
 	;==================================
 	; Get 2 points for rectangle 1
 	;==================================
-	call 	read_hex 
-	mov		dword [rectangle_1.top_left.x], eax 
-	call	read_hex 
-	mov 	dword [rectangle_1.top_left.y], eax 
-		
-	call	read_hex 	
-	mov		dword [rectangle_1.bottom_right.x], eax 
-	call	read_hex 
-	mov		dword [rectangle_1.bottom_right.y], eax 
-			
+	call	read_hex
+	mov		dword [rect1.a.x], eax
+	call	read_hex
+	mov		dword [rect1.a.y], eax
+	call	read_hex
+	mov		dword [rect1.b.x], eax
+	call	read_hex
+	mov		dword [rect1.b.y], eax
+	call	print_delimiter
+	
 	;==================================
 	; Get 2 points for rectangle 2
 	;==================================
-	call	read_hex 
-	mov		dword [rectangle_2.top_left.x], eax 
-	call	read_hex 
-	mov		dword [rectangle_2.top_left.y], eax 
-	
-	call	read_hex 
-	mov		dword [rectangle_2.bottom_right.x], eax 
-	call	read_hex 
-	mov 	dword [rectangle_2.bottom_right.y], eax 
+	call	read_hex
+	mov		dword [rect2.a.x], eax
+	call	read_hex
+	mov		dword [rect2.a.y], eax
+	call	read_hex
+	mov		dword [rect2.b.x], eax
+	call	read_hex
+	mov		dword [rect2.b.y], eax
+	call	print_delimiter
 	
 	;========================================================
 	; Check if any point of rectangle 1 is inside rectangle 2
 	;========================================================
-	mov 	eax, dword [rectangle_1.bottom_right.x]
-	cmp		eax, dword [rectangle_2.top_left.x]
-	jl 		not_intersecting 
 	
-	mov		eax, dword [rectangle_1.top_left.x]
-	cmp		eax, dword [rectangle_2.bottom_right.x]
-	jg		not_intersecting
+	; rect1 right is less than rect2 left
+	mov		eax, dword [rect1.b.x]
+	cmp		eax, dword [rect2.a.x]
+	jb		no_intersecting
 	
-	mov		eax, dword [rectangle_1.bottom_right.y]
-	cmp 	eax, dword [rectangle_2.top_left.y]
-	jl		not_intersecting
+	; rect1 left is greater than rect2 right
+	mov		eax, dword [rect1.a.x]
+	cmp		eax, dword [rect2.b.x]
+	ja		no_intersecting
 	
-	mov		eax, dword [rectangle_1.top_left.y]
-	cmp		eax, dword [rectangle_2.bottom_right.y]
-	jg 		not_intersecting
+	; rect1 top is greater than rect2 bottom
+	mov		eax, dword [rect1.a.y]
+	cmp		eax, dword [rect2.b.y]
+	ja		no_intersecting
 	
+	; rect1 bottom is less than rect2 top
+	mov		eax, dword [rect1.b.y]
+	cmp		eax, dword [rect2.a.y]
+	jb		no_intersecting
+	
+intersecting:
 	mov		eax, 1
-	jmp		print_result
+	call	print_eax
+	jmp		end_prog
 		
-not_intersecting:
-	mov 	eax, 0
+no_intersecting:
+	mov		eax, 0
+	call	print_eax
 
-print_result:
-	call	print_eax 
-
-Done:
-    ; Exit the process:
-	push	0
+end_prog:
+	push 	0
 	call	[ExitProcess]
-
-
+	
+	
 include 'training.inc'
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

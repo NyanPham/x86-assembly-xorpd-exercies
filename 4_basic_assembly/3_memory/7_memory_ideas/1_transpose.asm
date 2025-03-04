@@ -33,97 +33,152 @@
     ; 1.2   Print some cells of table A and table B to make sure that your code
           ; works correctly.
 
+format PE console
+entry start
 
+include 'win32a.inc' 
 
-format PE console 
-entry start 
+WIDTH = 0x4
+HEIGHT = 0x2
 
-include 'win32a.inc'
-
-WIDTH = 4
-HEIGHT = 2
-	
 section '.bss' readable writeable
-	table_a 	dd 		WIDTH * HEIGHT 		dup 	(?)
-	table_b		dd 		HEIGHT * WIDTH 		dup 	(?)
-	
-section '.text' code readable executable 
+	table_a 	dd		WIDTH*HEIGHT dup (?)
+	table_b 	dd		HEIGHT*WIDTH dup (?)
 
-start:
-	mov		esi, table_a 
-	xor		ebx, ebx 			; ebx = row counter 
+	temp		dd		?
+section '.text' code readable executable
 
-row_loop_a:
-	xor		ecx, ecx 			; ecx = column counter 
-column_loop_a:
-	mov 	eax, ebx 
-	add		eax, ecx 
-	mov 	dword [esi], eax 
-	
-	add		esi, 4
-	inc		ecx 
-	cmp		ecx, WIDTH
-	jnz 	column_loop_a
-		
-	inc		ebx 
-	cmp		ebx, HEIGHT
-	jnz 	row_loop_a 
-	
-	;=========================
-	; Transpose matrix
-	;=========================
+start:   
+
+	;========================
+	; Init table A
+	;========================
+init_tbl_a:
 	mov		esi, table_a
-	mov		edi, table_b 
-	xor 	ebx, ebx 
-row_loop_b:
-	xor		ecx, ecx 
-column_loop_b:
-	mov		eax, ecx
-	mov		edx, WIDTH * 4
-	mul		edx 
-	mov		edx, ebx 
-	shl		edx, 2
-	add		eax, edx 	
+	xor		ebx, ebx		; row
+.next_row:
+	xor		ecx, ecx		; col 
+.next_col:
+	mov		eax, ebx
+	mov		edx, WIDTH
+	mul		edx
+	add		eax, ecx
+	shl		eax, 2
+	lea 	edx, [esi + eax]
 	
-	mov		eax, dword [esi + eax]
-	mov		dword [edi], eax
-		
-	add		edi, 4
+	lea		eax, [ebx + ecx]
+	mov		dword [edx], eax
+	
+	inc		ecx
+	cmp		ecx, WIDTH	
+	jb		.next_col
+	
+	inc		ebx
+	cmp		ebx, HEIGHT
+	jb		.next_row
+	
+	;========================
+	; Transpose A into B
+	;========================
+transpose_a_2_b:
+	mov		esi, table_a
+	mov		edi, table_b
+	
+	xor		ebx, ebx		; row in a, col in b
+.next_row:
+	xor		ecx, ecx		; col in a, row in b
+.next_col:
+	; Get value in table_a 
+	mov		eax, ebx
+	mov		edx, WIDTH
+	mul		edx
+	add		eax, ecx
+	shl		eax, 2
+	lea		edx, [esi + eax]
+	mov		eax, dword [edx]
+	mov		dword [temp], eax
+	
+	; Copy the value to table_b
+	mov		eax, ecx
+	mov		edx, HEIGHT		; Width for table_b
+	mul		edx
+	add		eax, ebx
+	shl		eax, 2
+	lea		edx, [edi + eax]
+	mov		eax, dword [temp]
+	mov		dword [edx], eax
+	
+	inc		ecx
+	cmp		ecx, WIDTH
+	jb		.next_col
+	
+	inc		ebx
+	cmp		ebx, HEIGHT
+	jb		.next_row
+	
+	;========================
+	; Print table a
+	;========================
+print_tbl_a:
+	mov		esi, table_a
+	xor		ebx, ebx		; row
+.next_row:
+	xor		ecx, ecx		; col 
+.next_col:
+	mov		eax, ebx
+	mov		edx, WIDTH
+	mul		edx
+	add		eax, ecx
+	shl		eax, 2
+	lea 	edx, [esi + eax]
+	
+	mov		eax, dword [edx]
+	call	print_eax
+	
+	inc		ecx
+	cmp		ecx, WIDTH	
+	jb		.next_col
+	
+	call	print_delimiter
+	
+	inc		ebx
+	cmp		ebx, HEIGHT
+	jb		.next_row
+	
+	call	print_delimiter
+	
+	;========================
+	; Print table b
+	;========================
+print_tbl_b:
+	mov		esi, table_b
+	xor		ebx, ebx		; row
+.next_row:
+	xor		ecx, ecx		; col 
+.next_col:
+	mov		eax, ebx
+	mov		edx, HEIGHT
+	mul		edx
+	add		eax, ecx
+	shl		eax, 2
+	lea 	edx, [esi + eax]
+	
+	mov		eax, dword [edx]
+	call	print_eax
+	
 	inc		ecx
 	cmp		ecx, HEIGHT
-	jnz 	column_loop_b
-		
-	inc		ebx 
-	cmp		ebx, WIDTH 
-	jnz 	row_loop_b
+	jb		.next_col
 	
-	;=========================
-	; Print Test A
-	;=========================
-	xor		ecx, ecx 
-	mov		ebx, HEIGHT * WIDTH
-	mov		esi, table_a
-print_next_a:	
-	mov		eax, [esi + ecx * 4]
-	call	print_eax 
-	inc		ecx 
-	cmp		ecx, ebx 
-	jnz 	print_next_a
+	call	print_delimiter
 	
-	;=========================
-	; Print Test B
-	;=========================
-	xor		ecx, ecx 
-	mov		ebx, HEIGHT * WIDTH
-	mov		esi, table_b
-print_next_b:
-	mov		eax, [esi + ecx * 4]
-	call	print_eax 
-	inc		ecx 
-	cmp		ecx, ebx 
-	jnz 	print_next_b 
-		
-	push 	0
+	inc		ebx
+	cmp		ebx, WIDTH
+	jb		.next_row
+
+    ; Exit the process:
+	push	0
 	call	[ExitProcess]
+
 
 include 'training.inc'

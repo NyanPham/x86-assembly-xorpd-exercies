@@ -1,107 +1,121 @@
-format PE console
-entry start 
+; 0.  Prime counting
 
-include 'win32a.inc'
+    ; We want to calculate the amount of prime numbers between 1 and n.
+
+    ; Recall that a prime number is a positive integer which is only divisible by
+    ; 1 and by itself. The first prime numbers are 2,3,5,7,11,13. (1 is not
+    ; considered to be prime).
+
+    ; We break down this task into a few subtasks:
+
+    ; 0.  Write a function that takes a number x as input. It then returns 
+        ; eax = 1 if the number x is prime, and eax = 0 otherwise.
+
+    ; 1.  Write a function that takes a number n as input, and then calculates the
+        ; amount of prime numbers between 1 and n. Use the previous function that
+        ; you have written for this task.
+
+    ; Finally ask for an input number from the user, and use the last function you
+    ; have written to calculate the amount of prime numbers between 1 and n.
+
+    ; Bonus Question: After running your program for some different inputs, Can
+    ; you formulate a general rough estimation of how many primes are there
+    ; between 1 and n for some positive integer n?
+
+format PE console
+entry start
+
+include 'win32a.inc' 
 
 section '.data' data readable writeable
-	enter_number 		db	'Please enter a number: ',0
-	total_primes		db  'The total of primes is: ',0 
-	newline 			db  13,10,0
-
+    enter_num		db		'Enter a number: ',0xd,0xa,0
+	
+section '.bss' readable writeable
+    num				dd		?
+	
 section '.text' code readable executable
 
 start:
-	mov		esi, enter_number
-	call	print_str 
-		
-	call	read_hex 	
-	call	count_primes 
+	mov		esi, enter_num
+	call	print_str
 	
-	mov		esi, newline 
-	call	print_str 
-	mov		esi, total_primes
-	call	print_str  
-	call	print_eax 
+	call	read_hex
+	mov		dword [num], eax
 	
+	mov		edi, dword [num]
+	call	count_primes
+	call	print_eax
+	
+	 ; Exit the process:
 	push	0
 	call	[ExitProcess]
-	
-	
-;===============================================================
-; Input: eax -> number to check if it's a prime
-; Operation: Iterate from 1 to eax and divide by it to check 
-; 				if it's a divisor	
-; Output: eax <- 1 if prime, else eax <- 0 
-;=============================================================== 
-is_prime:
-	push	edi
-	push	edx
-	push	ecx	
-	
-	cmp		eax, 1 
-	
-	jbe 	.not_prime 	
-		
-	mov		edi, eax 
-	mov		ecx, eax
-.check_divisor:
-	dec		ecx 
-	cmp		ecx, 1 
-	jbe 	.prime 
-	
-	xor 	edx, edx 
-	mov		eax, edi 
-	div		ecx 
-	test	edx, edx 
-	jz		.not_prime 
-	jmp		.check_divisor
-	
-.not_prime:	
-	mov		eax, 0
-	jmp		.is_prime_done
-.prime:	
-	mov		eax, 1
-.is_prime_done:
-	pop 	ecx 
-	pop 	edx 
-	pop 	edi 
-	
-	ret 
-	
-;===============================================================
-; Input: eax -> number as an upperbound to check for total of primes
-; Operation: Iterate from 1 to eax and increment total if it's a prime	
-; Output: eax <- total of primes
-;=============================================================== 
+
+;================================
+; int count_primes(range);
+; 
+; edi -> range
+; eax -> returnValue
+;================================
 count_primes:
-	push	ebx
+	push	ecx
+	push	ebx	
+	
+	xor		ecx, ecx
+	xor		ebx, ebx
+.count_next:
+	push	edi
+	mov		edi, ecx
+	call	is_prime
+	test	eax, eax
+	jz		.skip_count
+	inc		ebx
+.skip_count:	
+	pop		edi
+	inc		ecx
+	cmp		ecx, edi
+	jb		.count_next
+	
+	mov		eax, ebx
+.end:
+	pop		ebx
+	pop		ecx
+	ret
+
+;================================
+; bool is_prime(num);
+; 
+; edi -> num
+; eax -> returnValue
+;================================
+is_prime:
 	push	ecx 
+	push	edx
+	push	edi
 	
-	xor		ebx, ebx 
-	xor		ecx, ecx 
+	cmp		edi, 0x2
+	jl		.not_prime
+	jz		.is_prime
 	
-	cmp		eax, 1
-	jbe 	.count_primes_done
-	
-.check_next:
-	push	eax 
-	mov		eax, ecx 
-	call	is_prime 
-	test	eax, eax 
-	jz		.not_prime 
-	inc		ebx 
+	mov		ecx, 0x2
+.check_loop:
+	xor		edx, edx
+	mov		eax, edi
+	div		ecx
+	cmp		edx, 0
+	jz		.not_prime
+	inc		ecx
+	cmp		ecx, edi
+	jnz		.check_loop
+.is_prime:
+	mov		eax, 0x1
+	jmp		.end
 .not_prime:
-	pop		eax 
-	inc		ecx 
-	cmp		ecx, eax 
-	jbe 	.check_next 
+	xor		eax, eax
+.end:
+	pop		edi
+	pop		edx
+	pop		ecx
+	ret
 
-.count_primes_done:
-	mov		eax, ebx 
-
-	pop		ecx 
-	pop		ebx 
-
-	ret 
 
 include 'training.inc'

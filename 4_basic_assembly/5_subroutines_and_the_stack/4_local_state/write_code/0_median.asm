@@ -21,362 +21,272 @@
 
     ; 2.  Bonus: What is the running time complexity of the function you wrote?
         ; Could you find a faster way to find the median of an array?
-	
-format PE console 
+
+format PE console
 entry start
-	
-include 'win32a.inc'
-		
-ARR_MAX_LEN = 40h
-		
+
+include 'win32a.inc' 
+
+MAX_ARR_LEN = 0x40
+
 section '.data' data readable writeable
-	enter_length 		db	'Please enter the length of the array:',13,10,0
-	enter_arr			db	'Please enter each number:',13,10,0
-	median_are			db	'The median of nums are:',13,10,0
-			
+	enter_size		db		'Please enter the size of the array: ',0
+	enter_nums		db		'Please enter numbers: ',0xd,0xa,0
+	new_line 		db		0xd,0xa,0
+	
+	sorted_nums		db		'Sorted nums array is: ',0xd,0xa,0
+	median_is		db		'The median is: ',0
+
 section '.bss' readable writeable
-	nums				dd	ARR_MAX_LEN	 dup (?)
-	medians 			dd	2 			 dup (?)
-	nums_len			dd	? 
+	nums 		dd		MAX_ARR_LEN  	dup 	(?)
+	nums_len	dd		? 
 	
 section '.text' code readable executable
+
 start:
-	mov		esi, enter_length
-	call	print_str 
-	call	read_hex 
-		
-	test	eax, eax 
-	jz		.end_program
+	push	nums_len
+	push	nums
+	call	get_nums
+	add		esp, 4*2
 	
-	mov		dword [nums_len], eax 
+	push	dword [nums_len]
+	push	nums
+	call	sort_nums
+	add		esp, 4*2
 	
-	mov		esi, enter_arr
-	call	print_str 
+	call	print_delimiter
+
+	mov	esi, sorted_nums
+	call	print_str
 	
-	mov		esi, nums
-	mov		ecx, dword [nums_len] 
-	push	ecx 
-	push	esi
-	call	fill_nums
-	add		esp, 4*2 
-	
-	mov		esi, nums
-	mov		ecx, dword [nums_len] 
-	push	ecx 
-	push	esi
-	call	sort_nums 
-	add		esp, 4*2 
-	
-	mov		esi, median_are
-	call	print_str 
-	
-	mov		ecx, dword [nums_len]
-	cmp		ecx, 3h 
-	jge		.need_find_medians
-	mov		esi, nums 
-	mov		eax, ecx 
-	jmp		.print_results
-	
-.need_find_medians:	
-	mov		esi, nums
-	mov		edi, medians
-	mov		ecx, dword [nums_len] 
-	push	ecx 
-	push	esi
-	push	edi 
-	call	get_median 
-	add		esp, 4*2 
-	mov		esi, medians
-	
-.print_results:
-	push	eax 
-	push	esi
-	call	print_medians
+	push	dword [nums_len]
+	push	nums
+	call	print_nums
 	add		esp, 4*2 
 
-.end_program:
+	call	print_delimiter
+	
+	mov	esi, median_is
+	call	print_str
+
+	push		dword [nums_len]
+	push		nums
+	call		find_median
+	add		esp, 4*2
+	
+	call	print_eax
+
+	mov	esi, new_line
+	call	print_str
+
+	
+    	; Exit the process:
 	push	0
 	call	[ExitProcess]
 	
-;=======================================
-; fill_nums(nums_addr, nums_len)
-;
-; Input: address of nums and nums length 
-; Output: void 
-; Operation: nums get filled by user input 
-;
 
-fill_nums:
-	.nums_addr = 8h
-	.nums_len = 0ch
-	push	ebp 
-	mov		ebp, esp
+;========================================
+; void get_nums(int* nums_addr, int* nums_len_addr)
+;========================================
+get_nums:
+	.nums_addr = 8
+	.nums_len_addr = 0ch
 	
-	push	ecx
-	push	ebx
-	push	esi
-	push	eax 
-	
-	mov		ecx, dword [ebp + .nums_len]
-	jecxz   .fill_done
-	mov		esi, dword [ebp + .nums_addr]
-	xor		ebx, ebx 
-.fill_next:
-	call	read_hex 
-	mov		dword [esi + ebx * 4], eax 
-	inc		ebx 
-	dec		ecx 
-	jnz		.fill_next
-	
-.fill_done: 
-	pop		eax 
-	pop		ebx 
-	pop		esi
-	pop		ecx 
-	
-	pop		ebp 
-	ret
-	
-;=======================================
-; print_nums(nums_addr, nums_len)
-;	
-; Input: address of nums and nums length 
-; Output: void 
-; Operation: print each number in nums 
-;
-
-print_nums:
-	.nums_addr = 8h
-	.nums_len = 0ch
-	push	ebp 
-	mov		ebp, esp
-		
-	push	esi
-	push	ecx 
-	push	ebx 
-	push	eax 
-	
-	mov		ecx, dword [ebp + .nums_len]
-	jecxz	.print_done
-	
-	mov		esi, dword [ebp + .nums_addr]
-	xor		ebx, ebx 
-.print_next:
-	mov		eax, dword [esi + ebx * 4]
-	call	print_eax 
-	inc		ebx 
-	dec		ecx 
-	jnz		.print_next
-.print_done:
-	pop		eax 
-	pop		ebx 
-	pop		ecx 
-	pop		esi
-	
-	pop		ebp
-	ret 
-	
-;=======================================
-; sort_nums(nums_addr, nums_len)
-;	
-; Input: address of nums and nums length 
-; Output: void 
-; Operation: bubble sort the nums from smallest to largest
-;
-
-sort_nums:
-	.nums_addr = 8h
-	.nums_len = 0ch 
-	push	ebp 
-	mov		ebp, esp
-	
-	push	esi
-	push	edi 
-	push	ecx 
-	push	ebx 
-	push	eax 
-		
-	mov		ecx, dword [ebp + .nums_len]
-	jecxz	.no_nums
-	mov		esi, dword [ebp + .nums_addr]
-	mov		edi, dword [ebp + .nums_addr]
-	lea		ebx, dword [edi + 4*ecx ] 
-.outer_loop:	
-	mov		edi, esi
-.inner_loop:
-	push	edi 
-	push	esi 
-	call	compare_and_swap
-	add		esp, 4*2 
-	add		edi, 4 
-	cmp		edi, ebx 
-	jb		.inner_loop
-	add		esi, 4 
-	cmp		esi, ebx 
-	jb		.outer_loop 
-		
-.no_nums:
-	pop		eax 
-	pop		ebx 
-	pop		ecx 
-	pop		edi
-	pop		esi
-	
-	pop		ebp 
-	ret 
-	
-;=======================================
-; compare_and_swap(x_addr, y_addr)
-;	
-; Input: addresses of 2 numbers: x, y
-; Output: void 
-; Operation: compare the value of 2 address and decide to swap if x > y 
-;
-
-compare_and_swap:
-	.x_addr = 8h
-	.y_addr = 0ch
-	push	ebp 
-	mov		ebp, esp
-		
-	push	esi 
-	push	edi 
-	
-	mov		esi, dword [ebp + .x_addr]
-	mov		edi, dword [ebp + .y_addr]
-
-	
-	mov		eax, dword [esi]
-	cmp		eax, dword [edi]
-	jle		.x_below_equal
-	
-	push	edi
-	push	esi
-	call	swap 
-	add		esp, 4*2 
-	
-.x_below_equal:
-	pop		edi 
-	pop		esi 
-	
-	pop		ebp 
-	ret 
-	
-;=======================================
-; swap(x_addr, y_addr)
-;	
-; Input: addresses of 2 numbers: x, y
-; Output: void 
-; Operation: swap the value in the addresses of x and y 
-;
-
-swap:
-	.x_addr = 8h
-	.y_addr = 0ch
 	push	ebp
 	mov		ebp, esp
 	
-	push	esi 
+	push	esi
 	push	edi
+	push	eax
+	push	ebx
+	push	ecx 
 	
-	mov		esi, dword [ebp + .x_addr]
-	mov		edi, dword [ebp + .y_addr]
+	mov		esi, enter_size
+	call	print_str
+	call	read_hex
 	
-	push	dword [esi]
-	push	dword [edi]
-	pop		dword [esi]
-	pop		dword [edi]
+	mov		edi, dword [ebp + .nums_len_addr] 
+	mov		dword [edi], eax
 	
+	mov		esi, enter_nums
+	call	print_str
+	
+	mov		edi, dword [ebp + .nums_addr]
+	mov		eax, dword [ebp + .nums_len_addr]
+	mov		ecx, dword [eax]
+	
+	jecxz	.done
+	xor		ebx, ebx
+.next_num:
+	push	edi
+	call	read_hex
+	pop		edi
+	
+	mov		dword [edi + 4*ebx], eax
+	
+	inc		ebx
+	dec		ecx
+	jnz		.next_num
+
+.done:
+	pop		ecx 
+	pop		ebx
+	pop		eax
 	pop		edi
 	pop		esi
 	
-	pop		ebp 
+	mov		esp, ebp
+	pop		ebp
 	ret 
-
-;=======================================
-; get_median(medians_addr, nums_addr, nums_len)
-; 
-; Input: Address of medians as target, address of nums as source, nums length
-; Output: change medians, eax = numbers of median 
-; Operation: divide length by 2, 
-;				decide to get 1 median if length is odd, 2 medians if even and fill the medians array 
-; 
-get_median:
-	.medians_addr = 8h
-	.nums_addr = 0ch 
-	.nums_len = 010h
-	push	ebp 
+	
+;=========================================
+; sort_nums(int* nums_addr, int nums_len)
+;=========================================
+sort_nums:
+	.nums_addr = 0x8
+	.nums_len = 0xc
+	
+	push	ebp
 	mov		ebp, esp
 	
 	push	esi
-	push	edi 
-	push	ecx 
-		
-	mov		ecx, dword [ebp + .nums_len]
-	jecxz	.nums_empty
-	mov		edi, dword [ebp + .medians_addr]
-	mov		esi, dword [ebp + .nums_addr]
-	shr		ecx, 1 
-	jc		.odd 
-.even:
-	mov		eax, dword [esi + ecx * 4 - 4]
-	mov		dword [edi], eax 
-	mov		eax, dword [esi + ecx * 4]
-	mov		dword [edi + 4], eax 
-	mov		eax, 2h
-	jmp 	.nums_empty
-	
-.odd:
-	mov		eax, dword [esi + ecx * 4]
-	mov		dword [edi], eax 
-	mov		dword [edi + 4],eax 
-	mov		eax, 1h
-.nums_empty:
-	pop		ecx 
-	pop		edi 
-	pop		esi
-	
-	pop		ebp 
-	ret 
-		
-;=======================================
-; print_medians(medians_addr, num_medians)
-;
-; Input: Address of medians array, numbers of medians (either 1 or 2)
-; Output: void 
-; Operation: Print each number in the medians array
-; 
-print_medians:
-	.medians_addr = 8h 
-	.num_medians = 0ch
-	push	ebp 
-	mov		ebp, esp
-	
-	push	esi
+	push	ebx
 	push	ecx
-	push	eax 
+	push	eax
+	push	edx
 	
-	mov		ecx, dword [ebp + .num_medians]
-	jecxz	.no_medians
-	mov		esi, dword [ebp + .medians_addr]
-	xor		ebx, ebx 
-.print_median:
-	mov		eax, dword [esi + ebx * 4]
-	call	print_eax 
-	inc		ebx 
-	dec		ecx 
-	jnz 	.print_median
+	mov		esi, dword [ebp + .nums_addr]
+	mov		ecx, dword [ebp + .nums_len]
+	jecxz	.done
+	dec		ecx
+	jecxz	.done
+.outer_loop:
+	xor		ebx, ebx
+.inner_loop:
+	mov		eax, dword [esi + 4*ebx]
+	mov		edx, dword [esi + 4*ebx + 4]
+	cmp		eax, edx
+	jb		.skip_swap
 
-.no_medians:
-	pop		eax 
-	pop		ecx 
-	pop		esi
+	lea		eax, dword [esi + 4*ebx]
+	lea		edx, dword [esi + 4*ebx + 4]
+	push	edx
+	push	eax
+	call	swap_nums
+	add		esp, 4*2
+
+.skip_swap:
+	inc		ebx
+	cmp		ebx, ecx
+	jb		.inner_loop
+
+	dec		ecx
+	cmp		ecx, 1
+	jae		.outer_loop
 	
-	pop		ebp 
+.done:
+	pop		edx
+	pop		eax
+	pop		ecx
+	pop		ebx
+	pop		esi
+
+	mov		esp, ebp 
+	pop		ebp
+	ret 
+;=========================================
+; swap_nums(a_addr, b_addr)
+;=========================================
+swap_nums:
+	.a_addr = 0x8
+	.b_addr = 0xc
+	
+	push	ebp
+	mov		ebp, esp
+	
+	push	eax
+	push	edx
+
+	mov		eax, dword [ebp + .a_addr]
+	mov		edx, dword [ebp + .b_addr]
+
+	push	dword [eax]
+	push	dword [edx]
+	pop		dword [eax]
+	pop		dword [edx]
+	
+	pop		edx
+	pop		eax
+	
+	mov		esp, ebp
+	pop		ebp
+	
+	ret
+
+
+;=========================================
+; find_median(int* nums_addr, int nums_len)
+;=========================================
+find_median:
+	.nums_addr = 0x8
+	.nums_len = 0xc
+
+	push	ebp
+	mov	ebp, esp
+
+	push	ebx
+	push	esi
+
+	; Find median index	
+	mov	ebx, dword [ebp + .nums_len]
+	shr	ebx, 0x1
+	
+	mov	esi, dword [ebp + .nums_addr]
+	mov  	eax, dword [esi + 4*ebx]
+
+	pop	esi
+	pop	ebx
+
+	mov	esp, ebp
+	pop	ebp
+	ret 
+
+
+;=========================================
+; print_nums(int* nums_addr, int nums_len)
+;=========================================
+print_nums:
+	.nums_addr = 0x8
+	.nums_len = 0xc
+	
+	push	ebp
+	mov		ebp, esp
+	
+	push	esi
+	push	ebx
+	push	ecx
+	push	eax
+	
+	mov		esi, dword [ebp + .nums_addr]
+	mov		ecx, dword [ebp + .nums_len]
+	jecxz	.done
+	xor		ebx, ebx
+.print_num:	
+	mov		eax, dword [esi + 4*ebx]
+	call	print_eax
+
+	inc		ebx
+	dec		ecx 
+	jnz		.print_num
+	
+.done:
+	pop		eax
+	pop		ecx
+	pop		ebx
+	pop		esi
+
+	mov		esp, ebp 
+	pop		ebp
 	ret 
 	
-	
-	
-
-
 include 'training.inc'

@@ -14,116 +14,89 @@
     ; Write a program that takes a string as input, and decides whether it is a
     ; palindrome or not. It then prints an appropriate message to the user.
 
-format PE console 
-entry start 
+format PE console
+entry start
 
-include 'win32a.inc'
+include 'win32a.inc' 
 
-MAX_USER_TEXT = 40h
+MAX_USER_LEN = 0x40
 
 section '.data' data readable writeable
-	enter_text				db 	'Please enter a string of anything: ',13,10,0 
-	is_palindrome_text 		db	'Your text is a palindrome',0
-	not_palindrome_text		db	'Your text is not a palindrome',0
+    empty_str				db		'Oops! You entered an empty string!',0xd,0xa,0
+	
+	enter_text				db		'Enter text: ',0xd,0xa,0
+	is_palindrome_text		db		' is a palindrome.',0xd,0xa,0
+	not_palindrome_text		db		' is not a palindrome.',0xd,0xa,0
 	
 section '.bss' readable writeable
-	user_text		db 	 MAX_USER_TEXT 	dup 	(?)
-	stack_arr		dd 	 MAX_USER_TEXT 	dup 	(?)
-	text_len 		dd 	 ? 
-	mid_idx			dd 	 ?
+    user_text		db		MAX_USER_LEN 	dup 	(?)
+	user_text_len	dd		?
 	
 section '.text' code readable executable
-	
+
 start:
-	;==========================================================================
-	; print prompt
-	;==========================================================================
-	mov		esi, enter_text						
-	call	print_str 
+    mov		esi, enter_text
+	call	print_str
 	
-	;==========================================================================
-	; get user input of char sequence
-	;==========================================================================
-	mov		edi, user_text 						
-	mov		ecx, MAX_USER_TEXT
-	call	read_line 
-	
-	;==========================================================================	
-	; get the length of input 
-	;==========================================================================		
-	mov		edi, user_text 						
-	mov		ecx, MAX_USER_TEXT	
-	xor		al, al 
-	repnz	scasb	
+	mov		ecx, MAX_USER_LEN
+	mov		edi, user_text
+	call	read_line
+		
+	; Find user text length
+	mov		ecx, MAX_USER_LEN
+	mov		esi, user_text
+	xor		al, al
+	repnz	scasb
 		
 	neg		ecx
-	add		ecx, MAX_USER_TEXT 
+	add		ecx, MAX_USER_LEN
 	dec		ecx 
-	;==========================================================================
-	; then find the middle index by length / 2 to separte left half and right.
-	;==========================================================================	
-	mov 	dword [text_len], ecx				 
-	shr		ecx, 1	
-	mov		dword [mid_idx], ecx 
+	mov		dword [user_text_len], ecx
 	
-	;==========================================================================
-	; start to push right half of the original string,
-	;==========================================================================
-	mov		ebx, dword [text_len] 				
-	dec		ebx 								; ebx = last index (length - 1) 
-	xor		ecx, ecx 							; ecx = 0 (index in stack_arr) to store the reversed
+	test	ecx, ecx
+	jz		invalid_input
+	
+	; Compare using 2 pointers
+	mov		esi, user_text		; user_text[0]
+	mov		edi, esi
+	add		edi, dword [user_text_len]
+	dec		edi					; user_text[len-1]
+compare_char:
+	cmp		esi, edi
+	jae		.is_palindrome
+	
+	mov		al, byte [esi]
+	cmp		al, byte [edi]
+	jnz		.is_not_palindrome
+	
+	inc		esi 
+	dec		edi
+	jmp		compare_char
+	
+.is_palindrome:
 	mov		esi, user_text
-	mov		edi, stack_arr
-			
-push_next_byte:									; push and reverse the right half of the orignal string
-	cmp		ebx, 0
-	jl		end_stack_push
-	cmp		ecx, dword [mid_idx]
-	jz		end_stack_push
-		
-	mov		al, byte [esi + ebx]
-	mov		byte [edi + ecx], al
-	inc		ecx 
-	dec		ebx 
-	jmp		push_next_byte
+	call	print_str
 	
-	;==========================================================================
-	; compare each byte between the original left with reversed right
-	;==========================================================================
-end_stack_push:
-	mov		esi, stack_arr  					
-	mov		edi, user_text 
-	xor 	ecx, ecx 
-		
-check_next:
-	mov		al, byte [esi + ecx] 
-	test	al, al
-	jz		is_palindrome
-		
-	cmp		al, byte [edi + ecx]	
-	jnz 	not_palindrome
-			
-	inc		ecx 
-	jmp 	check_next
+	mov		esi, is_palindrome_text
+	call	print_str
+	jmp		end_prog
 	
-is_palindrome:
-	mov		eax, is_palindrome_text
-	jmp 	done_check
-not_palindrome:
-	mov		eax, not_palindrome_text
-		
-done_check:
-	mov		esi, eax 
-	call	print_str 
+.is_not_palindrome:
+	mov		esi, user_text
+	call	print_str
+
+	mov		esi, not_palindrome_text
+	call	print_str
+	jmp		end_prog
+
+invalid_input:
+	mov		esi, empty_str
+	call	print_str
 	
+end_prog:
+    ; Exit the process:
 	push	0
 	call	[ExitProcess]
-	
+
+
 include 'training.inc'
-	
-	
-	
-	
-	
-	
-	

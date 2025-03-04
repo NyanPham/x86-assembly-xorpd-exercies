@@ -18,184 +18,162 @@
       ; Output: Substring was found at locations:
               ; 0
               ; 23
-
-format PE console 
+  
+format PE console
 entry start
 
-include 'win32a.inc'
+include 'win32a.inc' 
 
-STR_MAX_LEN		=	40h
-MAX_LOCATIONS 	=	10h
+MAX_USER_LEN = 0x40
+
+section '.data' data readable writeable
+    empty_str				db		'Oops! You entered an empty string!',0xd,0xa,0
+	enter_text				db		'Enter text: ',0xd,0xa,0
+	enter_substr			db		'Enter text to search: ',0xd,0xa,0
+	found_locations			db		'Substring was found at locations: ',0xd,0xa,0
+	no_locations			db		'Substring was not found',0xd,0xa,0
+	newline					db		0xd,0xa,0
 	
-section '.data' data readable writeable 
-	enter_s1				db		'Please enter the string:',13,10,0
-	enter_s2				db  	'Please enter the substring:',13,10,0
-	result_str 				db		'Substring was found at locations:',13,10,0
-	no_result_str			db		'No substring found in',0
-	invalid_input			db		'Either S1 or S2 is empty!',0
-		
-section '.bss' readable writeable 
-	s1 						db 		STR_MAX_LEN 	dup 	(?)
-	s1_len					dd 		? 
-	s2 						db 		STR_MAX_LEN 	dup 	(?)
-	s2_len					dd		? 
-	rs_locations			dd		MAX_LOCATIONS	dup		(?)
-	rs_idx					dd		? 
-	has_substring 			db		0 
-		
-section '.text' code readable executable	
+section '.bss' readable writeable
+    user_text			db		MAX_USER_LEN 	dup 	(?)
+	user_text_len		dd		?
+	substr_text			db		MAX_USER_LEN	dup		(?)
+	substr_text_len		dd		?
 	
+	locations			dd		MAX_USER_LEN	dup		(?)
+	
+	is_tracking			db		0
+	lock_idx			dd		0
+	locations_count		dd		0
+	
+section '.text' code readable executable
+
 start:
-
-	;==============================================
-	; Get the input for both string and substring
-	;==============================================
-get_string_1:
-	mov		esi, enter_s1
-	call	print_str 
+	;=============================
+	; Enter input text
+	;=============================
+    mov		esi, enter_text
+	call	print_str
 	
-	mov		edi, s1 
-	mov		ecx, STR_MAX_LEN
-	call	read_line 
-	
-.find_str_len_1:
-	mov		esi, s1
-	mov		ecx, STR_MAX_LEN
-	xor 	al, al 
-	repnz	scasb 
-	
-	neg 	ecx 
-	add		ecx, STR_MAX_LEN
+	mov		ecx, MAX_USER_LEN
+	mov		edi, user_text
+	call	read_line
+		
+	; Find user text length
+	mov		ecx, MAX_USER_LEN
+	mov		esi, user_text
+	xor		al, al
+	repnz	scasb
+		
+	neg		ecx
+	add		ecx, MAX_USER_LEN
 	dec		ecx 
-	mov		dword [s1_len], ecx 
-		
-get_string_2:
-	mov		esi, enter_s2 
-	call	print_str 
+	mov		dword [user_text_len], ecx
 	
-	mov		edi, s2 
-	mov		ecx, STR_MAX_LEN
-	call	read_line 
+	test	ecx, ecx
+	jz		invalid_input
 	
-.find_str_len_2:
-	mov		esi, s2 
-	mov		ecx, STR_MAX_LEN
-	xor 	al, al 
-	repnz 	scasb 
+	;=============================
+	; Enter substring
+	;=============================
+	mov		esi, enter_substr
+	call	print_str
+	
+	mov		ecx, MAX_USER_LEN
+	mov		edi, substr_text
+	call	read_line
 		
-	neg 	ecx
-	add		ecx, STR_MAX_LEN
+	; Find user text length
+	mov		ecx, MAX_USER_LEN
+	mov		esi, substr_text
+	xor		al, al
+	repnz	scasb
+		
+	neg		ecx
+	add		ecx, MAX_USER_LEN
 	dec		ecx 
-	mov		dword [s2_len], ecx 	
-		
-	;==============================================
-	; Check any length if 0. If 0, don't process
-	; searching for substring
-	;==============================================
-	cmp		dword [s1_len], 0 
-	jz 		print_invalid 
-	cmp		dword [s2_len], 0
-	jz		print_invalid 
-			
-	mov		dword [rs_idx], 0d 
-
-	;==============================================
-	; ebx = current string1 index 
-	; ecx = current string2 index
-	; edx = string1 index for inner iteration
-	;==============================================
-search_substring:
-	xor		ebx, ebx 
-	xor		ecx, ecx 
-	xor		edx, edx 
+	mov		dword [substr_text_len], ecx
 	
-	mov		esi, s1 
-	mov		edi, s2 
+	test	ecx, ecx
+	jz		invalid_input
 	
-check_next_char:
-	mov		al, byte [esi + ebx] 
-	cmp		al, byte [edi + ecx] 
-	jnz 	not_match 
+	;=========================================
+	; Search for indices of substring in text
+	;=========================================
+search_substr_in_text:
+	xor		eax, eax				; just for clearing
+	mov		esi, user_text
+	mov		edi, substr_text
+	xor		ecx, ecx				; text idx
+	xor		ebx, ebx				; substr idx
+.next_char:
+	mov		al, byte [esi + ecx]
+	test	al, al
+	jz		.terminated
+	cmp		al, byte [edi + ebx]
+	jnz		.reset_tracking
+	cmp		byte [is_tracking], 0
+	jnz		.continue_tracking
 	
-	mov		edx, ebx 
-inner_loop:
-	inc 	edx
-	cmp 	edx, dword [s1_len]
-	jz		done 
-	inc 	ecx
-	cmp		ecx, dword [s2_len]
-	jz		found_one 
+	mov		byte [is_tracking], 1
+	mov		dword [lock_idx], ecx
 	
-	mov		al, byte [esi + edx]
-	cmp		al, byte [edi + ecx]
-	jnz		not_match
-	jmp		inner_loop
+.continue_tracking:
+	inc		ebx				
+	cmp		byte [edi + ebx], 0			; Are we the end of the substring
+	jnz		.skip_append_location		
+	mov		eax, dword [lock_idx]		; Yes, then add lock_idx into location
+	mov		edx, dword [locations_count]
+	mov		dword [locations + 4*edx], eax
+	inc		edx
+	mov		dword [locations_count], edx
+	xor		ebx, ebx
+	mov		byte [is_tracking], 0
+.skip_append_location:	
+	inc		ecx
+	jmp		.next_char
 	
-found_one:
-	mov		eax, dword [rs_idx] 
-	mov		dword [rs_locations + eax * 4], ebx  
-	inc		dword [rs_idx]
-	mov		byte [has_substring], 1h
-		
-not_match:
-	xor		ecx, ecx 
-	inc		ebx 
-	cmp		ebx, dword [s1_len]
-	jnz 	check_next_char 
-	
-done:
-	cmp		byte [has_substring], 0  
-	jnz 	print_substring_locations
-	
-	mov		esi, no_result_str
-	call	print_str 
-	jmp 	search_substring_end
-	
-print_substring_locations:
-	mov		esi, result_str
-	call	print_str 
-	
-	xor 	ecx, ecx 
-	mov		esi, rs_locations
-print_rs:
-	mov		eax, dword [rs_locations + ecx * 4] 
-	call	print_eax 
+.reset_tracking:
+	cmp		byte [is_tracking], 0
+	jz		.skip_reset_txt_index
+	mov		byte [is_tracking], 0	; Turn off the flag
+	mov		ecx, dword [lock_idx]	; Restore the index in text
+	dec		ecx
+.skip_reset_txt_index:
 	inc		ecx 
-	cmp		ecx, dword [rs_idx] 
-	jnz 	print_rs
+	xor		ebx, ebx				; Restore the index in substr
+	jmp		.next_char
 	
-	jmp 	search_substring_end
+.terminated:	
+	mov		ecx, dword [locations_count]
+	test	ecx, ecx
+	jz		.print_no_results
 	
-print_invalid:
-	mov		esi, invalid_input
-	call	print_str 
+	mov		esi, found_locations
+	call	print_str
 	
-search_substring_end:
+	mov		esi, locations
+.print_next_location:
+	mov		eax, dword [esi]
+	call	print_eax
+	add		esi, 4
+	dec		ecx
+	jnz		.print_next_location
+	jmp		end_prog
+
+.print_no_results:
+	mov		esi, no_locations
+	call	print_str
+
+	jmp		end_prog
+invalid_input:
+	mov		esi, empty_str
+	call	print_str
 	
+end_prog:
+    ; Exit the process:
 	push	0
 	call	[ExitProcess]
-	
-include 'training.inc'
-	
 
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
+include 'training.inc'

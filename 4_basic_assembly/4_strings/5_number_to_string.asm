@@ -23,71 +23,97 @@
 
       ; - Build a string and print it. Remember the null terminator!
 
-
 format PE console
 entry start
 
 include 'win32a.inc' 
 
-DEC_NUM_MAX_LEN		=	10d  
+MAX_STR_LEN = 0x40
 
-section '.data' data readable writeable 
-	enter_hex_num			db		'Please enter a hex number:',13,10,0
+section '.data' data readable writeable
+	enter_num				db		'Enter hex: ',0xd,0xa,0
 	
-section '.bss' readable writeable 
-	hex_num					dd 		? 
-	dec_num_str 			db		DEC_NUM_MAX_LEN + 1  dup	(?)
-	dec_num_str_len			dd		?
+section '.bss' readable writeable
+	hex_num					dd		?
+	dec_str					db		MAX_STR_LEN		dup  (0)
+	dec_str_len				dd		0
+	outbound				db		0
 	
 section '.text' code readable executable
+
+start:
+	mov		esi, enter_num
+	call	print_str
 	
-start:	
-	mov		esi, enter_hex_num
-	call	print_str 
-		
-	call 	read_hex 
-	mov		dword [hex_num], eax 
+	call	read_hex
+	mov		dword [hex_num], eax
 	
-	mov		ebx, 10d
-	mov		ecx, 0 			; index in dec_num_str 
-		
-compute_dec_digit:
-	xor		edx, edx 
-	div		ebx
-	add		edx, 30h 
-	mov		byte [dec_num_str + ecx], dl  
-	inc		ecx
-	test	eax, eax 
-	jnz		compute_dec_digit
-		
-	mov		dword [dec_num_str_len], ecx 
+	;====================================
+	; Repeat division to find next digit
+	;====================================
+	mov		ebx, 10			; divisor
+	mov		esi, 1			; prev_divisor
+	xor		ecx, ecx
+	mov		edi, dec_str
+next_digit:
+	xor		edx, edx
+	mov		eax, dword [hex_num]
+	idiv	ebx
+	mov		eax, edx
+	cmp		eax, dword [hex_num]
+	jnz		.still_in_bound
 	
-reverse_dec_num_str:
-	mov		edx, ecx
-	dec		edx 
-	shr		ecx, 1	
-	xor		ebx, ebx 
-	mov		esi, dec_num_str
+	cmp		byte [outbound], 0
+	jnz		.done
+	inc		byte [outbound]
+
+.still_in_bound:
+	xor		edx, edx
+	div		esi
+	mov		esi, ebx
 	
-.reverse_next_char:
-	mov		al, byte [esi + ebx]
-	mov		ah, byte [esi + edx]
-	mov		byte [esi + ebx], ah
-	mov		byte [esi + edx], al 
-	inc		ebx 
-	dec		edx 
-	clc 
+	add		eax, 0x30
+	mov		byte [edi + ecx], al
+	inc		dword [dec_str_len]
+	
+	mov		edx, ebx
+	shl		ebx, 0x2
+	add		ebx, edx
+	shl		ebx, 0x1			; divisor *= 10
+	
+	inc		ecx 
+	cmp		ecx, MAX_STR_LEN-1
+	jnz		next_digit
+
+.done:
+	;=======================
+	; Revert the order
+	;=======================
+	xor		ebx, ebx
+	mov		ecx, dword [dec_str_len]
 	dec		ecx 
-	jnz		.reverse_next_char
-.reverse_done:
-	mov		eax, dword [dec_num_str_len]
-	mov		byte [esi + eax], 0 
+	mov		esi, dec_str
+swap_next:
+	cmp		ebx, ecx
+	jae		.done_swap
 	
-print_result:
-	mov		esi, dec_num_str
-	call	print_str 
+	mov		al, byte [esi + ebx]
+	mov		dl, byte [esi + ecx]
+	mov		byte [esi + ebx], dl
+	mov		byte [esi + ecx], al
 	
+	inc		ebx
+	dec		ecx
+	jmp		swap_next
+
+.done_swap:
+	mov		esi, dec_str
+	call 	print_str
+
+end_prog:
+    ; Exit the process:
 	push	0
 	call	[ExitProcess]
-	
+
+
 include 'training.inc'

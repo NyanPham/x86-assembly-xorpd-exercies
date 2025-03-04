@@ -6,8 +6,34 @@
 ; 
 ; Scalar product
 ; @@@@@@@@@@@@@@
+;    
+; 0.    Skim the code. Take a look at the functions and their descriptions.
+;       Understand the dependencies between the functions (Which function calls
+;       which function), and what is the special purpose of every function.
 ;
-	
+; 1.    Read the main code (Beginning from start), and see how the function
+;       scalar_product is being called. Which calling convention is being used?
+;
+; 2.    Fill in the scalar_product function. This function calculates the scalar
+;       product (Sometimes referred to as inner product) between two vectors.
+;       See exact formula in the comments below.
+;       
+;       Note that you may only fill in the scalar_product function. Do not
+;       change the rest of the code.
+;       
+;       Make sure that you deal with arguments and the stack according to the
+;       correct calling convention. Think about the following:
+;       - Who should clean the stack?
+;       - Where should the return value be?
+;       - Saving registers to the stack, so that your function will not have
+;         side effects.
+;
+; 3.    Assemble and run the code. Verify the result that you get.
+;
+;       Just to be sure, check the value of esp before and after
+;       the call to scalar_product, to verify that the stack is balanced.
+;
+
 format PE console
 entry start
 
@@ -25,18 +51,24 @@ section '.data' data readable writeable
     scalar_result   db  'Scalar product result: ',0
 ; ===============================================
 section '.text' code readable executable
-	
+
 start:
+	mov		eax, esp
+	call	print_eax
+
     ; Invoke scalar product of vec1 and vec2:
     push    vec1
     push    vec2
     call    scalar_product
-	
+
     ; Print result to the console:
     mov     esi,scalar_result
     call    print_str
     call    print_eax
-
+	
+	mov		eax, esp
+	call	print_eax
+	
     ; Exit the process:
 	push	0
 	call	[ExitProcess]
@@ -50,43 +82,38 @@ start:
 ; Output:
 ;   (v1.x * v2.x) + (v1.y * v2.y)
 ; Calling Covention:
-;   Data Stack
+;   STDCALL
 ;
 
 ; **** Fill in this function ****
 scalar_product:
-	push	ebx 
-	push	ecx 
-	push	edx 
+	push	ebx
+	push	ecx
+	push	edx
+	push	esi
+	push	edi
 	
-	xor 	ebx, ebx 		
-	xor 	ecx, ecx 
-	xor 	edx, edx 
-			
-	mov		eax, dword [esp + 8 + 0ch]	
-	mov		ebx, dword [esp + 4 + 0ch]  
+	mov		esi, dword [esp + 0x4 + 0x14]		; *v1
+	mov		edi, dword [esp + 0x8 + 0x14]		; *v2
+	mov		eax, dword [esi + VEC.x]			; v1->x
+	mov		ebx, dword [edi + VEC.x]			; v2->x
+	xor		edx, edx
+	mul		ebx
+	mov		ecx, eax							; v1->x * v2->x
 	
-	mov		eax, dword [eax + VEC.x]
-	mov		ebx, dword [ebx + VEC.x]
-		
-	mul		ebx 		
-	mov		ecx, eax 						; ecx = v1.x * v2.x 
-			
-	xor 	edx, edx 
-	mov		eax, dword [esp + 8 + 0ch]	
-	mov		ebx, dword [esp + 4 + 0ch]  
+	mov		eax, dword [esi + VEC.y]			; v1->y
+	mov		ebx, dword [edi + VEC.y]			; v2->y
+	xor		edx, edx
+	mul		ebx
+	add		eax, ecx
 	
-	mov		eax, dword [eax + VEC.y] 
-	mov		ebx, dword [ebx + VEC.y] 
-		
-	mul 	ebx 							; eax = v1.y * v2.y 
-	add		eax, ecx 						; eax = (v1.x * v2.x) + (v1.y * v2.y)
-	
-	pop 	edx 
+.done:
+	pop		edi
+	pop		esi
+	pop		edx
 	pop		ecx
-	pop		ebx 
-	
-	ret 	8 
-	
+	pop		ebx
+	ret		4*2
+
 
 include 'training.inc'

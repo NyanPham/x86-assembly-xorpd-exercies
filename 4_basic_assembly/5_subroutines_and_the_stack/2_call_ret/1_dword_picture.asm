@@ -1,131 +1,178 @@
+; 1.  Dword picture
+    
+    ; Given a dword x, we create a corresponding ASCII picture.
+    ; We use the following procedure:
+
+    ; 0.  We look at the binary representation of x, and divide it to pairs of
+        ; bits. We then order the pairs of bits in a square of size 4 X 4.
+
+        ; Example: 
+          ; For the dword 0xdeadbeef, we get:
+          ; 0xdeadbeef = 11011110101011011011111011101111
+          ; 0xdeadbeef = 11 01 11 10 10 10 11 01 10 11 11 10 11 10 11 11
+
+          ; Ordered in a square:
+          
+          ; 11 01 11 10
+          ; 10 10 11 01
+          ; 10 11 11 10
+          ; 11 10 11 11 
+
+    ; 1.  Next we convert every pair of bits into one ASCII symbol, as follows:
+
+        ; 00 -> *
+        ; 01 -> :
+        ; 10 -> #
+        ; 11 -> @
+
+        ; Example:
+          ; For the dword 0xdeadbeef, we get the following interesting picture:
+
+          ; @:@#
+          ; ##@:
+          ; #@@#
+          ; @#@@
+
+    ; Write a program that takes a dword x as input, and prints the corresponding
+    ; picture representation as output.
+
+    ; HINT: Organize your program using functions:
+
+      ; - Create a function that transforms a number into the ASCII code of the
+        ; corresponding symbol. {0 -> * , 1 -> : , 2 -> # , 3 -> @}
+
+      ; - Create a function that takes as arguments an address of a buffer and a
+        ; number x. This function will fill the buffer with the resulting ascii
+        ; picture. Make sure to leave room for the newline character sequences,
+        ; and for the null terminator.
+
+      ; - Finally allocate a buffer on the bss section, read a number from the
+        ; user and use the previous function to fill in the buffer on the bss
+        ; section with the ASCII picture. Then print the ASCII picture to the
+        ; user.
+
 format PE console
 entry start
 
-include 'win32a.inc'
+include 'win32a.inc' 
 
-BUFFER_LENGTH = 10h
-NEWLINES_LENGTH = 4h
-	
+PIC_SIZE = 0x4
+
 section '.data' data readable writeable
-	enter_hex		db		'Please enter a hex number: ',0
-	newline 		db		13,10,0
-	picture_is		db		'The dword picture is: ',13,10,0
-	
-	star			db		'*',0
-	colon			db 		':',0
-	hash			db 		'#',0
-	atSign			db		'@',0 
+	symbols		db		'*:#@',0
+	enter_num	db		'Enter a number: ',0xd,0xa,0
+	new_line	db		0xd,0xa,0
 	
 section '.bss' readable writeable
-	buffer 			db		BUFFER_LENGTH + NEWLINES_LENGTH + 1 	dup ('*')	
-	BUFFER_LENGTH 	=	($ - buffer) 
+	pic			db		4*PIC_SIZE+2*3+1	dup (0)	
+	pic_idx		dd		?
 	
 section '.text' code readable executable
-		
+
 start:
-	call	read_hex 
-	call	split_fill_buffer
-		
-	mov		esi, picture_is
-	call	print_str 
-			
-	mov		esi, buffer	 
-	call	print_str 
-		
+	mov		esi, enter_num
+	call	print_str
+	
+	call	read_hex
+
+	mov		edi, pic
+	mov		esi, eax
+	call	fill_pic
+	
+	mov		esi, new_line
+	call	print_str
+	
+	mov		esi, pic
+	call	print_str
+	
+	mov		esi, new_line
+	call	print_str
+	mov		esi, new_line
+	call	print_str
+	
+    ; Exit the process:
 	push	0
 	call	[ExitProcess]
-	
-	
-;====================================================
-; Transform a number of 2 bits into the ASCII code
-; Input: eax = 2 bits to convert 
-; Operation: acts as a map to return a corressponding 
-; 			ASCII char 
-; Ouput: eax = ASCII char
-;====================================================
-bits_2_ascii:
-	test 	al, al 
-	jz 		.is_star
-	cmp		al, 1h
-	je 		.is_colon
-	cmp		al, 2h
-	je		.is_hash 
-	cmp		al, 3h
-	je 		.is_at 
-	jmp 	.convert_done
-.is_star:
-	mov		al, byte [star] 
-	jmp		.convert_done
-.is_colon:
-	mov		al, byte [colon] 
-	jmp		.convert_done
-.is_hash:
-	mov		al, byte [hash] 
-	jmp		.convert_done
-.is_at:
-	mov		al, byte [atSign]
-.convert_done:
-	ret 
-	
-;====================================================
-; Split bits pairs and fill buffer
-; Input: eax = the hex number to split into bit pairs
-; Operation: convert each pair into ascii char 
-;			and fill in the 
-; Ouput: eax = ASCII char
-;====================================================
-split_fill_buffer:
-	push 	eax 
-	push	ebx 
-	push	ecx 
-	push	edx 
-	
-	mov		ebx, eax 
-	mov		esi, buffer 
-	mov		edi, BUFFER_LENGTH + NEWLINES_LENGTH
-	xor 	ecx, ecx 
-	
-.split_or_newline:
-	push	ecx 
-	xor		edx, edx  
-	mov		eax, ecx  
-	
-	mov		ecx, 6
-	div		ecx 
-	test	edx, edx 
-	jnz		.split
-		
-	pop		ecx 
-	mov		ax, word [newline]
-	mov		word [esi + ecx], ax 
-	inc 	ecx 
-	jmp		.check_next 
-	
-.split:
-	pop		ecx 
-	xor		eax, eax 
-	shl		ebx, 1 
-	rcl		al, 1
-	shl		ebx, 1 
-	rcl		al, 1
-	
-	call	bits_2_ascii
-	mov		byte [esi + ecx], al 
-	
-.check_next:
-	inc		ecx 
-	cmp		ecx, edi 
-	jbe		.split_or_newline
 
-.split_fill_done:
-	mov		ecx, BUFFER_LENGTH + NEWLINES_LENGTH + 1
-	mov		byte [esi + ecx], 0 
+;================================
+; void fill_pic(char* pic, int num)
+; 
+; edi: char* pic
+; esi: int num
+;================================
+fill_pic:
+	pusha 
 	
-	pop		edx 
-	pop		ecx 
-	pop		ebx
-	pop		eax 
+	mov		dword [pic_idx], 0
+	mov		ecx, 0x14
+.inner_loop:
+	mov		eax, dword [pic_idx]
+	cmp		eax, 0x4
+	jz		.is_new_line
+	cmp		eax, 0xa
+	jz		.is_new_line
+	cmp		eax, 0x10
+	jz		.is_new_line
 	
+	rol		esi, 2
+	
+	mov		ebx, edi				; save char* pic
+	mov		edx, esi				; and save num
+		
+	mov		eax, esi				; num 
+	and		eax, 0x3				; num &= b11
+	
+	mov		edi, eax
+	call	num_to_symbol
+	
+	mov		edi, ebx				; restore char* pic
+	mov		esi, edx				; and restore num
+		
+	mov		ebx, dword [pic_idx]
+	mov		byte [edi + ebx], al
+	
+	jmp		.skip_new_line
+	
+.is_new_line:
+	mov		byte [edi + eax], 0xd
+	mov		byte [edi + eax + 1], 0xa
+	add		dword [pic_idx], 2
+	jmp		.next
+	
+.skip_new_line:
+	inc		dword [pic_idx]
+.next:
+	dec		ecx 
+	jnz		.inner_loop
+	
+.done:	
+	mov		eax, dword [pic_idx]
+	mov		byte [edi + eax - 1], 0x0		
+
+	popa 
 	ret 
+
+
+;================================
+; char num_to_symbol(int num)
+; 0 <= num <= 3 (2-bit num)
+;
+; edi: num
+; eax: return char
+;================================
+num_to_symbol:
+	push	esi
 	
+	
+	cmp		edi, 0x3
+	ja		.done
+	mov		esi, symbols
+	xor		eax, eax
+	mov		al, byte [esi + edi]
+	
+.done:
+	pop		esi
+	ret
+
+
 include 'training.inc'

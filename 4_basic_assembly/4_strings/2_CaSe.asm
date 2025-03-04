@@ -11,91 +11,90 @@
     ; You may assume that the input is only made of letters. (No spaces or
     ; other punctuation marks).
 	
-
-format PE console 
+format PE console
 entry start
 
 include 'win32a.inc' 
 
-USER_MAX_STR = 40h
-	
+MAX_USER_LEN = 0x40
+
 section '.data' data readable writeable
-	enter_text			db		'Please enter a string: ',13,10,0 
-	flipped_version		db 		'The flipped output is: ', 13,10,0
+    empty_str				db		'Oops! You entered an empty string!',0xd,0xa,0
+	enter_text				db		'Enter text: ',0xd,0xa,0
 	
 section '.bss' readable writeable
-	user_str			db 		USER_MAX_STR 	dup 	(?) 
-	user_str_len		dd		?
-	user_str_case 		db		USER_MAX_STR	dup 	(?)
-		
+    user_text		db		MAX_USER_LEN 	dup 	(?)
+	user_text_len	dd		?
+	
 section '.text' code readable executable
 
 start:
-	mov		esi, enter_text 
-	call	print_str 
+    mov		esi, enter_text
+	call	print_str
 	
-	mov		edi, user_str 
-	mov		ecx, USER_MAX_STR
-	call	read_line 
-	
-	mov		esi, user_str
-	mov		ecx, USER_MAX_STR
-	xor		al, al 
-	repnz	scasb 
-	
-	neg 	ecx 
-	add		ecx, USER_MAX_STR 
+	mov		ecx, MAX_USER_LEN
+	mov		edi, user_text
+	call	read_line
+		
+	; Find user text length
+	mov		ecx, MAX_USER_LEN
+	mov		esi, user_text
+	xor		al, al
+	repnz	scasb
+		
+	neg		ecx
+	add		ecx, MAX_USER_LEN
 	dec		ecx 
-	mov		dword [user_str_len], ecx 
+	mov		dword [user_text_len], ecx
 	
-	mov		esi, user_str 
-	mov		edi, user_str_case	
-	mov		ecx, dword [user_str_len]
+	test	ecx, ecx
+	jz		invalid_input
 
-	xor 	eax, eax 
-case_next:
-	lodsb 	
+	; Flip case of characters
+	mov		esi, user_text
+flip_case:
+	lodsb
+	test	al, al
+	jz		terminated
 	
-	;============================================
-	; Check the upper bound of chars
-	; the char in hex must be in range between
-	; 41 and 7a
-	;============================================
-	cmp		al, 41h 
-	jb		cpy_char
-	cmp		al, 7ah 
-	ja		cpy_char
-			
-	;============================================
-	; The middle part between the range also has
-	; special chars. So we check:
-	; char > 41 and char < 5a -> uppercase
-	; char > 61 and char < 7a -> lowercase
-	;============================================
-	cmp		al, 5ah 
-	jl		is_upper_case
-	cmp		al, 61h 
-	ja 		is_lower_case 
-	jmp		cpy_char 
+	lea		edi, [esi - 1]
 	
-is_upper_case:
-	add		al, 20h 				; uppercase char + 20h = lowercase
-	jmp		cpy_char 
+	cmp		al, 0x41
+	jb		.skip
+	cmp		al, 0x7a
+	ja		.skip
 	
-is_lower_case:
-	sub		al, 20h 				; lowercase char - 20h = uppercase
-			
-cpy_char:
-	stosb 
-	dec		ecx 
-	jnz		case_next
-			
-	mov		esi, user_str_case
-	call	print_str 
+	cmp		al, 0x5a
+	jbe		.is_upper
+	cmp		al, 0x61
+	jae		.is_lower
+	jmp		.skip
 	
+.is_upper:
+	add		al, 0x20
+	mov		byte [edi], al
 	
+	jmp		.skip
+.is_lower:
+	sub		al, 0x20
+	mov		byte [edi], al
+	
+.skip:
+	jmp		flip_case
+	
+terminated:
+	mov		esi, user_text
+	call	print_str
+	jmp		end_prog
+	
+invalid_input:
+	mov		esi, empty_str
+	call	print_str
+	
+end_prog:
+    ; Exit the process:
 	push	0
 	call	[ExitProcess]
 
+
 include 'training.inc'
-	

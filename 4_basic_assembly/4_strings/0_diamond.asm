@@ -26,109 +26,110 @@
 format PE console
 entry start
 
-include 'win32a.inc'
+include 'win32a.inc' 
 
 section '.data' data readable writeable
-	enter_size	db	'Enter the size of the diamond:',13,10,0
-	no_size		db	'You want a diamond of 0 (or even negative) width?',13,10,0
-	new_line	db  13,10,0
-	space		db  ' ',0
-	star		db  '*',0
+	enter_text		db 	'Enter a star size: ',0xd,0xa,0x0
+	invalid_n		db	'Invalid size entered. ',0xd,0xa,0x0
+	space			db	0x20,0
+	star			db	'*',0
+	newline			db	0xd,0xa,0
 	
 section '.bss' readable writeable
-	diamond_width 			dd		?
-	diamond_middle_row		dd 		?
-	row_before_bottom 		dd 		?
-	
+	size_n			dd		?
+	diamond_size	dd		?
+	mid_idx		dd		?
+
 section '.text' code readable executable
-		
+
 start:
-	mov		esi, enter_size
-	call	print_str 
+	mov		esi, enter_text
+	call	print_str
 	
 	call	read_hex
-	cmp		eax, 0 
-	jg		move_on
+	mov		dword [size_n], eax
 	
-	mov		esi, no_size
-	call	print_str 
-	jmp 	prog_end
+	cmp		dword [size_n], 0
+	jle		invalid_input
 	
-move_on:	
-	inc 	eax 
-	mov		dword [diamond_middle_row], eax 
-	dec 	eax 
+	; Compute diamond width
+	mov		eax, dword [size_n]
+	shl		eax, 0x1
+	inc		eax
+	mov		dword [diamond_size], eax
 	
-	shl		eax, 1
-	inc		eax 
-	mov		dword [diamond_width], eax 
+	mov		eax, dword [size_n]
+	mov		dword [mid_idx], eax
 	
-	xor		ebx, ebx 
-next_row_top:	
-	mov		eax, ebx 
-	shl		eax, 1 
-	inc		eax 
+	mov		esi, newline
+	call	print_str
 	
-	mov		ecx, dword [diamond_width]
-	sub		ecx, eax 
-	shr		ecx, 1
-		
-	test 	ecx, ecx 
-	jz		print_star_top
+	; Draw diamond 
+	mov		ecx, dword [diamond_size]
+	xor		ebx, ebx
+draw_line:
+	; Find num of stars in line
+	cmp		ebx, dword [mid_idx]
+	ja		lower_half
 	
-print_space_top:
-	mov		esi, space 
-	call	print_str 
-	loop	print_space_top 
-		
-print_star_top:
-	mov		esi, star 
-	call	print_str 
-	dec		eax 
-	jnz 	print_star_top 
+	mov		eax, ebx
+	shl		eax, 0x1
+	inc		eax
+	jmp		find_spaces
+lower_half:
+	mov		eax, ecx
+	dec		eax
+	shl		eax, 0x1
+	inc		eax
+	
+find_spaces:
+	; Find num of spaces on left/right size in line
+	mov		edx, dword [diamond_size]
+	sub		edx, eax
+	shr		edx, 0x1
+	mov		edi, edx
+	
 
-done_top_row:
-	mov		esi, new_line
-	call	print_str 
-	
-	inc		ebx 
-	cmp		ebx, dword [diamond_middle_row]
-	jnz 	next_row_top
-	
-	sub		ebx, 2
-next_row_bottom:
-	mov		eax, ebx 
-	shl		eax, 1 
-	inc		eax 	
-	
-	mov		ecx, dword [diamond_width]
-	sub		ecx, eax 
-	shr		ecx, 1
-		
-	test 	ecx, ecx 
-	jz		print_star_bottom
-	
-print_space_bottom:
-	mov		esi, space 
-	call	print_str 
-	loop	print_space_bottom 
-	
-print_star_bottom:
-	mov		esi, star 
-	call	print_str 
-	dec		eax 
-	jnz 	print_star_bottom 
-	
-done_top_bottom:
-	mov		esi, new_line
-	call	print_str 
-		
-	dec		ebx 
-	cmp		ebx, 0
-	jge		next_row_bottom
+print_left_space:	
+	cmp		edx, 0
+	jz		print_star
+	mov		esi, space
+	call	print_str
+	dec		edx
+	jmp		print_left_space
 
-prog_end:
+print_star:
+	cmp		eax, 0
+	jz		print_right_space
+	mov		esi, star
+	call	print_str
+	dec		eax
+	jmp		print_star
+
+print_right_space:
+	cmp		edi, 0
+	jz		done_line
+	mov		esi, space
+	call	print_str
+	dec		edi
+	jmp		print_right_space
+
+done_line:
+	mov		esi, newline
+	call	print_str
+	
+	inc		ebx
+	dec		ecx 
+	jnz		draw_line
+	
+	jmp		end_prog
+invalid_input:
+	mov		esi, invalid_n
+	call	print_str
+	
+end_prog:
+    ; Exit the process:
 	push	0
 	call	[ExitProcess]
-	
+
 include 'training.inc'

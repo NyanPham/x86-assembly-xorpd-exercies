@@ -10,94 +10,85 @@
 	; Plan:	
 		; Instead of creating the whole matrix, create only 2 rows and work all the 
 		; down to the Nth row.
-		
-format PE console 
+
+format PE console
 entry start
-	
-include 'win32a.inc'
-		
-N = 5	
-		
-section '.bss' readable writeable 
-	prev_row 		dd	N dup (?)
-	curr_row 		dd 	N dup (?)
-	
+
+include 'win32a.inc' 
+
+TBL_SIZE = 0x5
+
+section '.bss' readable writeable
+	curr_row	dd		TBL_SIZE	dup 	(?)
+	prev_row	dd		TBL_SIZE	dup		(?)
+	temp1		dd		?
+	temp2		dd		?
+    
 section '.text' code readable executable
-	
+
 start:
-	;=================================================
-	; Initialize the first row to be one 
-	;=================================================
-	mov 	esi, prev_row
-	mov		ecx, 0
-init_first_row:	
-	mov 	dword [esi + ecx * 4], 1
-	inc 	ecx 
-	cmp		ecx, N
-	jne		init_first_row
-			
-	;=================================================;
-	; Compute number path to each row
-	;=================================================
-	mov		ebx, 1
-compute_next_row:
+
+	;======================================
+	; Initialize num paths table
+	;======================================
+init_tbl:
+	; First row to be all 1
+	xor		ecx, ecx
 	mov		esi, prev_row
-	mov		edi, curr_row 
+.next_prev_cell:
+	mov		dword [esi + 4*ecx], 1
+	inc		ecx
+	cmp		ecx, TBL_SIZE
+	jb		.next_prev_cell
 	
-	mov		dword [esi], 1d
-	mov		dword [edi], 1d
+	; Second row, first cell is 1
+	mov		esi, curr_row
+	mov		dword [esi], 1
+
+	;======================================
+	; Populate num paths table
+	;======================================
+populate_tbl:
+	mov		esi, prev_row
+	mov		edi, curr_row
+	
 	mov		ecx, 1
-compute_next_cell:
-	mov		eax, dword [esi + ecx * 4]
-	add		eax, dword [edi + ecx * 4 - 4]
-	mov		dword [edi + ecx * 4], eax 
-	
-	inc 	ecx 
-	cmp		ecx, N 
-	jnz		compute_next_cell 
-	
-	; Done computing, move the curr_row to prev_row 
-	mov		ecx, 1
-move_next_cell:
-	mov		eax, dword [edi + ecx * 4]
-	mov		dword [esi + ecx * 4], eax 
-	
-	inc		ecx 
-	cmp 	ecx, N 
-	jnz 	move_next_cell 
-		
+	; Compute the curr_row based on prev_row
+.compute_row:
+	mov		ebx, 1	
+.next_cell:
+	mov		eax, dword [esi + 4*ebx]
+	mov		edx, ebx
+	dec		edx
+	add		eax, dword [edi + 4*edx]
+	mov		dword [edi + 4*ebx], eax
 	inc		ebx 
-	cmp		ebx, N 
-	jnz 	compute_next_row 
-		
-	;=================================================
-	; Print result test 
-	;=================================================
-	mov		esi, prev_row
-	mov		ecx, N - 1
-	mov		eax, dword [esi + ecx * 4]
-	call	print_eax 
+	cmp		ebx, TBL_SIZE
+	jb		.next_cell
+
+	; Done compute row, swap rows
+	mov		ebx, 1
+.swap_cell:
+	mov		eax, dword [edi + 4*ebx]
+	mov		dword [esi + 4*ebx], eax
 	
+	inc		ebx 
+	cmp		ebx, TBL_SIZE
+	jb		.swap_cell
+
+	inc		ecx
+	cmp		ecx, TBL_SIZE
+	jb		.compute_row	
+
+print_result:
+	mov		ecx, TBL_SIZE-1
+	mov		eax, dword [edi + 4*ecx]
+	call	print_eax
+
+
+    ; Exit the process:
 	push	0
 	call	[ExitProcess]
-	
+
+
 include 'training.inc'
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	

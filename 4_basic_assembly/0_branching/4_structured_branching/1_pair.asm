@@ -4,36 +4,39 @@
 format PE console
 entry start
 
-include 'win32a.inc'
+include 'win32a.inc' 
 
 ; ===============================================
 section '.text' code readable executable
-	
+
 start:
-	call read_hex 
-	mov ecx,eax 
-	mov edx,1			; ebx = x + 1 = 1
-y_loop: 				; for ebx, ebx < edx < ecx 
-	mov ebx,0
-x_loop: 				; for ebx, ebx < edx, starts at 0	
-print_x_y:
-	mov eax,ebx 
-	call print_eax 
-	mov eax,edx 
-	call print_eax 
+	call	read_hex
+	mov		esi, eax 
 	
-next_x:
-	inc ebx 
-	cmp ebx,edx 
-	jb 	x_loop 
-	
+; outerloop for y:
 next_y:
-	inc edx
-	cmp edx,ecx 
-	jb y_loop
+	dec		esi
+	cmp		esi, 0 
+	jle		done
+
+	mov		edi, esi
+next_x:
+	dec		edi
 	
+	cmp		edi, 0
+	jl		next_y
+	
+	mov		eax, edi
+	call	print_eax
+	mov		eax, esi 
+	call	print_eax
+		
+	jmp		next_x
+
+done:
     ; Exit the process:
 	push	0
 	call	[ExitProcess]
 
 include 'training.inc'
+

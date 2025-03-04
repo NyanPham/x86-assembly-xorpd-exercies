@@ -1,3 +1,10 @@
+; 2.  Find yourself
+    
+    ; Write a program that finds the current value of EIP and prints it to the
+    ; console.
+
+    ; HINT: Use CALL.
+
 format PE console 
 entry start 
 

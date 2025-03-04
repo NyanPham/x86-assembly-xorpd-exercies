@@ -28,90 +28,127 @@
     ; In addition, the program prints the area of the rectangle that won the area
     ; competition.
 
-format PE console
+formatformat PE console
 entry start
 
-include 'win32a.inc' 
+include 'win32a.inc'
 
 struct PNT 
-	x 	dd	?
-	y 	dd  ?
-ends 
-	
-struct rectangle 
-	point_1 	PNT 	?
-	point_2 	PNT 	?
-ends 
-	
-; This is the bss section:
-; ===============================================
-section '.bss' readable writeable
-    rectangle_1			rectangle   ? 
-	rectangle_2 		rectangle   ?
-	area_1				dd 			?
-	area_2 				dd 			?
-	
-; This is the text section:
-; ===============================================
+	x	dd	?
+	y	dd	?
+ends
+
+struct RECT
+	a	PNT		?
+	b	PNT		?
+ends
+
+section '.bss' readable writable
+	rect1		RECT 	?
+	rect2		RECT 	?
+	area1		dd		?
+	area2		dd		?
+
 section '.text' code readable executable
 
-start:
-	call 	read_hex 
-	mov 	dword [rectangle_1.point_1.x], eax 
-	call	read_hex 
-	mov		dword [rectangle_1.point_1.y], eax 
+start:	
+	call	read_hex
+	mov		dword [rect1.a.x], eax
+	call	read_hex
+	mov		dword [rect1.a.y], eax
+	call	read_hex
+	mov		dword [rect1.b.x], eax
+	call	read_hex
+	mov		dword [rect1.b.y], eax
+	call	print_delimiter
 	
-	call	read_hex 
-	mov 	dword [rectangle_1.point_2.x], eax 
-	call	read_hex 
-	mov 	dword [rectangle_1.point_2.y], eax 
+	call	read_hex
+	mov		dword [rect2.a.x], eax
+	call	read_hex
+	mov		dword [rect2.a.y], eax
+	call	read_hex
+	mov		dword [rect2.b.x], eax
+	call	read_hex
+	mov		dword [rect2.b.y], eax
+	call	print_delimiter
+	
+compute_area_1:
+	xor		edi, edi 
+	
+	; Get height of rect1
+	mov		eax, dword [rect1.a.y]
+	sub		eax, dword [rect1.b.y]
+	
+	; abs(height)
+	cdq								
+	xor		eax, edx
+	sub		eax, edx
+	mov		edi, eax	
 
-	call	read_hex 
-	mov 	dword [rectangle_2.point_1.x], eax 
-	call	read_hex 
-	mov		dword [rectangle_2.point_1.y], eax 
+	; Get width of rect1
+	mov		eax, dword [rect1.a.x]
+	sub		eax, dword [rect1.b.x]
 	
-	call	read_hex 
-	mov		dword [rectangle_2.point_2.x], eax 
-	call	read_hex 
-	mov		dword [rectangle_2.point_2.y], eax 
+	; abs(width)
+	cdq
+	xor		eax, edx
+	sub		eax, edx
 	
-calc_area_1:
-	mov 	eax, dword [rectangle_1.point_2.x] 
-	mov		ebx, dword [rectangle_1.point_1.x]
-	sub 	eax, ebx 
-	mov 	esi, eax 
+	; Get area 
+	mul		edi
+	mov		dword [area1], eax 
 	
-	mov 	eax, dword [rectangle_1.point_2.y] 
-	mov		ebx, dword [rectangle_1.point_1.y]
-	sub 	eax, ebx
-	mul 	esi
-	mov		dword [area_1], eax 
+compute_area_2:
+	xor		edi, edi 
 	
-calc_area_2:
-	mov 	eax, dword [rectangle_2.point_2.x] 
-	mov		ebx, dword [rectangle_2.point_1.x]
-	sub 	eax, ebx 
-	mov 	esi, eax 
-		
-	mov 	eax, dword [rectangle_2.point_2.y] 
-	mov		ebx, dword [rectangle_2.point_1.y]
-	sub 	eax, ebx
-	mul 	esi
-compare:
-	cmp 	eax, dword [area_1] 
-	jg 		second_bigger 
-first_bigger:
+	; Get height of rect1
+	mov		eax, dword [rect2.a.y]
+	sub		eax, dword [rect2.b.y]
+	
+	; abs(height)
+	cdq
+	xor		eax, edx
+	sub		eax, edx
+	mov		edi, eax	
+
+	; Get width of rect1
+	mov		eax, dword [rect2.a.x]
+	sub		eax, dword [rect2.b.x]
+	
+	; abs(width)
+	cdq
+	xor		eax, edx
+	sub		eax, edx
+	
+	; Get area 
+	mul		edi
+	mov		dword [area2], eax 
+
+	
+	; Compare 2 areas
+	call	print_delimiter
+	
+	mov		eax, dword [area1]
+	mov		ebx, dword [area2]
+	
+	cmp		eax, ebx
+	jb		area2_larger
+area1_larger:
 	mov		eax, 0
-	jmp 	print_result
-second_bigger:
-	mov 	eax, 1
-		
-print_result:
-	call	print_eax 
-    ; Exit the process:
-	push	0
+	call	print_eax
+	mov		eax, dword [area1]
+	call	print_eax
+	jmp		end_prog
+	
+area2_larger:
+	mov		eax, 1
+	call	print_eax
+	mov		eax, dword [area2]
+	call	print_eax
+	
+end_prog:
+	push 	0
 	call	[ExitProcess]
-
-
+	
+	
 include 'training.inc'

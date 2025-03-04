@@ -6,128 +6,66 @@
 format PE console
 entry start
 
-include 'win32a.inc'
+include 'win32a.inc' 
 
 ; ===============================================
 section '.text' code readable executable
-	
-start:
-	call read_hex 
-	mov cl,al 
-	
-	mov esi,0
-	mov ch, cl 
-loopA:
-	mov bl, cl 			
 
-loopB:
-	mov bh, cl 
-		
-loopC: 
-calculate:	
-	mov eax,0			; get a^2
-	mov al, ch 
-	mul eax 
-	mov esi,eax
-		
-	mov eax,0 
-	mov al, bl 
-	mul eax 
-	add esi,eax 		; a^2 + b^2 
+start:
+	call 	read_hex
+	mov		cl, al
 	
-	mov eax,0
-	mov al, bh 
-	mul eax 
-	cmp esi,eax 		; a^2 + b^2 = c^2
+	mov		ch, cl
+	mov		bl, cl
+	mov		bh, cl
 	
-	jnz no_print 
-		
-print_triple:
-			
-	mov eax,0
-	mov al, ch 
-	call print_eax 
-	mov al, bl 
-	call print_eax 
-	mov al, bh 
-	call print_eax 
+	mov		esi, 0
+
+calculate:
+	mov		eax, 0			; a^2
+	mov		al, ch 
+	mul		eax 
+	mov		esi, eax
 	
-no_print:
-	dec bh
-	jns loopC 
-			
-	dec bl  
-	jns loopB 
+	mov		eax, 0
+	mov		al, bl
+	mul		eax
+	add		esi, eax		; a^2 + b^2 
 	
-	dec ch 
-	jns loopA 
+	mov		eax, 0
+	mov		al, bh
+	mul		eax 
+	cmp		eax, esi
 	
+	; a^2 + b^2 != c^2 ?
+	jne		skip_print 		
+							
+	; a^2 + b^2 == c^2:
+	mov		eax, 0			
+	mov		al, ch
+	call	print_eax 
+	mov		al, bl
+	call	print_eax
+	mov		al, bh
+	call	print_eax
+	
+skip_print:
+	dec		bh
+	jns		calculate
+	
+	mov		bh, cl 
+	dec 	bl
+	jns 	calculate
+	
+	mov		bl, cl
+	dec		ch	
+	jns		calculate
+	
+
+done:
     ; Exit the process:
 	push	0
 	call	[ExitProcess]
 
 include 'training.inc'
 
-
-
-
-
-
-
-
-
-
-
-
-7
-7
-0
-7
-6
-0
-6
-5
-0
-5
-4
-3
-5
-4
-0
-4
-3
-4
-5
-3
-0
-3
-2
-0
-2
-1
-0
-1
-0
-7
-7
-0
-6
-6
-0
-5
-5
-0
-4
-4
-0
-3
-3
-0
-2
-2
-0
-1
-1
-0
-0
-0

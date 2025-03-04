@@ -12,157 +12,108 @@
 
       ; Output: The character e is the most common character on the string.
               ; Amount of occurrences: 8
-	
 
-format PE console 
-entry start 
+format PE console
+entry start
 
-include 'win32a.inc'
+include 'win32a.inc' 
 
-MAX_USER_STR	=	80h
+MAX_USER_LEN = 0x40
 
 section '.data' data readable writeable
-	enter_str		db		'Please enter string: ',13,10,0
-	found_char 		db		'The character x is the most common character on the string.',13,10,0
-	amount_occur	db 		'Amount of occurrences: ',0
-	space			db 		' ',0	
-		
-section '.bss' readable	writeable
-	user_str		db 		MAX_USER_STR 	dup 	(?)
-	user_str_len	dd		? 
-	has_swap		db 		? 
+    empty_str				db		'Oops! You entered an empty string!',0xd,0xa,0
+	enter_text				db		'Enter text: ',0xd,0xa,0
 	
-	common_char 	db		?
-	common_count	dd		0
-			
+	output1_txt				db		'The character ',0
+	output2_txt				db		' is the most common character on the string.',0xd,0xa,0
+	output3_txt				db		'Amount of occurrences: ',0
+	
+section '.bss' readable writeable
+    user_text			db		MAX_USER_LEN 	dup 	(?)
+	user_text_len		dd		?
+	char_count_tbl		dd		0xff			dup		(0)
+	common_char			db		0x2				dup		(0)
+	
 section '.text' code readable executable
-	
+
 start:
-	mov		esi, enter_str
-	call	print_str 
-		
-	mov		edi, user_str 
-	mov		ecx, MAX_USER_STR
+    mov		esi, enter_text
+	call	print_str
+	
+	mov		ecx, MAX_USER_LEN
+	mov		edi, user_text
 	call	read_line
 		
-	mov		esi , user_str
-	mov		ecx, MAX_USER_STR
+	; Find user text length
+	mov		ecx, MAX_USER_LEN
+	mov		esi, user_text
 	xor		al, al
-	repnz	scasb 
-			
-	neg		ecx 
-	add		ecx, MAX_USER_STR
-	dec		ecx 	
-	mov		dword [user_str_len], ecx 
-	
-	
-	;=========================================
-	; We will sort the string to have the 
-	; chars in order
-	;=========================================	
-sort_chars:
-	mov		esi, user_str
-	mov		ecx, dword [user_str_len]
-	dec 	ecx 
-	mov		byte [has_swap], 0 
-	xor		ebx, ebx 
+	repnz	scasb
 		
-next_char:
-	xor		eax, eax 
-	xor		edx, edx 
-	
-	mov		al, byte [esi + ebx]
-	mov		dl, byte [esi + ebx + 1]
-	cmp		al, dl 
-		
-	jbe		no_swap
-	
-swap:	
-	mov		byte [esi + ebx], dl
-	mov		byte [esi + ebx + 1], al
-	mov		byte [has_swap], 1h	
-	
-no_swap:		
-	inc		ebx
+	neg		ecx
+	add		ecx, MAX_USER_LEN
 	dec		ecx 
-	jnz		next_char 
+	mov		dword [user_text_len], ecx
 	
-	cmp		byte [has_swap], 0d
-	jnz 	sort_chars
-	
-sort_chars_done:
-	
-	;=========================================
-	; Iterate through each char 
-	; compare it with the previous char
-	; if the same char code, increment its count 
-	; else, check if its count is the max 
-	; and update common_char, common_count 
-	; before iterate next char 
-	;=========================================	
+	test	ecx, ecx
+	jz		invalid_input
 
-	mov		esi, user_str
-	xor		ebx, ebx 
-	mov		ecx, dword [user_str_len]
-	dec		ecx 
-	xor		edx, edx
-	xor		eax, eax 
-	mov		ah, byte [esi] 
+	; Count chars into table
+	xor		eax, eax
+	mov		esi, user_text
+	mov		edi, char_count_tbl
+count_char:
+	lodsb	
+	test	al, al
+	jz		.terminated
+	cmp		al, 0x20
+	jz		.skip_count
+	inc		dword [edi + 4*eax]
+.skip_count:
+	jmp		count_char
+
+.terminated:
+	; Find char with most count
+	xor		ebx, ebx			; index			
+	xor		edx, edx			; largest count
+	mov		esi, char_count_tbl
+	xor		ecx, ecx
+check_next:	
+	mov		eax, dword [esi + 4*ecx]
+	cmp		eax, edx
+	jle		.not_larger
+	mov		ebx, ecx
+	mov		edx, eax
 	
-count_next:	 
-	mov		al, byte [esi + ebx]
-	cmp		al, byte [space]
-	je 		countdown 		
-	
-	inc		edx
-	cmp		al, ah
-	jne 	iterate_next_char
-	jmp		countdown
-	
-iterate_next_char:
-	cmp		edx, dword [common_count] 
-	jle		update_prev_char 
-	
-	mov		byte [common_char], ah 
-	mov		dword [common_count], edx 
-	
-update_prev_char:
-	mov		ah, al 
-	xor		edx, edx
-	
-countdown:
-	inc		ebx
-	dec		ecx 
-	jnz		count_next 
-			
-check_done:
-	mov		al, byte [common_char]
-	mov 	esi, found_char
-	mov		byte [esi + 14], al 	
-	call	print_str 
-	
-	;==========================================
-	; Convert count in hex to ASCII 
-	;==========================================
-	mov		esi, amount_occur
-	call	print_str 
-	
-	mov		eax, dword [common_count]
-	call	print_eax 
+.not_larger:
+	inc		ecx 
+	cmp		ecx, 0xff
+	jnz		check_next
 		
+	mov		edi, common_char
+	mov		byte [edi], bl
+	mov		byte [edi + 1], 0x0
+	
+	mov		esi, output1_txt
+	call	print_str
+	mov		esi, common_char
+	call	print_str
+	mov		esi, output2_txt
+	call	print_str
+	mov		esi, output3_txt
+	call	print_str
+	mov		eax, edx
+	call	print_eax
+	
+	jmp 	end_prog
+invalid_input:
+	mov		esi, empty_str
+	call	print_str
+	
+end_prog:
+    ; Exit the process:
 	push	0
 	call	[ExitProcess]
-	
+
+
 include 'training.inc'
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	

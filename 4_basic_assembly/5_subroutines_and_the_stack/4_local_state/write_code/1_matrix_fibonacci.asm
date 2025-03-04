@@ -68,296 +68,283 @@
 ; ==> Need time to anaylize the 5. Bonus
 ;
 
-
 format PE console
 entry start
 
-include 'win32a.inc'
-	
-struct Matrix 
-	i 	dd	?
-	j   dd	?
-	k	dd	?
-	z 	dd	? 
-ends	
-	
+include 'win32a.inc' 
+
+struct MATRIX
+	a	dd	?
+	b	dd	?
+	c	dd	?
+	d	dd 	?
+ends
+
 section '.data' data readable writeable
-	enter_power			db		'Please enter the n-th to compute Fibonacci: ',0
-	power_result		db		'The n-th Fibonacci is: ',0
-	base_matrix 		Matrix 		1, 1, 1, 0	
+	enter_k				db		'Enter the k of fibonacci: ',0
+	init_matrix			MATRIX 	1,1,1,0
+	result_is			db		'The fibonacci is: ',0
 	
 section '.bss' readable writeable
-	matrix_prod			Matrix 		?
+	res_matrix		MATRIX		?
+	
+section '.text' code readable executable
 
-section '.text' code readable executable 
-		
-start:	
-	mov		esi, enter_power
+start:
+	mov		esi, enter_k
 	call	print_str
-	call	read_hex 	
 	
-	push	eax 
-	mov		esi, base_matrix
-	push	esi 
-	call	power_matrix
-	add		esp, 4*2 	
-		
-	mov		edi,  matrix_prod
-	push	edi
+	call	read_hex
+	
+	push	res_matrix
 	push	eax
-	call	copy_matrix
-	add		esp, 4*2 
-		
-	mov		esi, power_result
-	call	print_str 
+	push	init_matrix
+	call	matrix_power
+	add		esp, 4*3
 	
-	mov		eax, dword [matrix_prod.j]
-	call	print_eax 
+	mov		esi, result_is
+	call	print_str
 	
+	mov		eax, dword [res_matrix.b]
+	call	print_eax
+
+    ; Exit the process:
 	push	0
 	call	[ExitProcess]
-	
-;=========================
-; print_matrix(matrix_addr)
-;
-; Operation: load and print each entry in the matrix
-;
- 
-print_matrix:
-	.matrix_addr = 8h
-	push	ebp 
-	mov		ebp, esp 
-	
-	push	eax 
-	push	esi
-	
-	mov		esi, dword [ebp + .matrix_addr]
-	
-	mov		eax, dword [esi + Matrix.i]
-	call	print_eax 
-		
-	mov		eax, dword [esi + Matrix.j]
-	call	print_eax 
-	
-	mov		eax, dword [esi + Matrix.k]
-	call	print_eax 
-		
-	mov		eax, dword [esi + Matrix.z]
-	call	print_eax 
-	
-	
-	pop		esi 
-	pop		eax 
-	
-	pop		ebp 
-	ret 
-	
-;==========================
-; copy_matrix(source_matrix_addr, destination_matrix_addr)
-;
-; Input: addresses of source and destination matrices
-; Operation: load and copy each entry (i, j, k, z) from the source to destination
-; Output: void 
-; 
 
-copy_matrix: 
-	.source_matrix_addr = 8h
-	.destination_matrix_addr = 0ch
-	push	ebp 
-	mov		ebp, esp
-	
-	push	esi
-	push	edi
-	push	eax 
-	
-	mov		esi, dword [ebp + .source_matrix_addr]
-	mov		edi, dword [ebp + .destination_matrix_addr]
-		
-	mov 	eax, dword [esi + Matrix.i]
-	mov		dword [edi + Matrix.i], eax 
-	
-	mov 	eax, dword [esi + Matrix.j]
-	mov		dword [edi + Matrix.j], eax 
-		
-	mov 	eax, dword [esi + Matrix.k]
-	mov		dword [edi + Matrix.k], eax 
-		
-	mov 	eax, dword [esi + Matrix.z]
-	mov		dword [edi + Matrix.z], eax 
-		
-	pop		eax 
-	pop		edi 
-	pop		esi
-	
-	pop		ebp 
-	ret 
-	
-
-;==========================
-; mul_matrices(base_matrix_addr, matrix_mulr_addr, matrix_prod_addr)
-; 
-; Input: address of the matrix as multiplicand, address of the matrix as multiplier, and address of matrix as product 
-; Operation: 
-; 	A =  | a  b |   ,    B = | e  f |
-       ; | c  d |            | g  h |
-    
-; AB = | ae + bg   af + bh |
-	 ; | ce + dg   cf + dh |
-; Output: void
-;
-
+;======================================================
+; mul_matrices(matrix_1_addr, matrix_2_addr, res_addr)
+;======================================================
 mul_matrices:
-	.base_matrix_addr = 8h
-	.matrix_mulr_addr = 0ch
-	.matrix_prod_addr = 010h
-	push	ebp 
+	.matrix_1_addr = 0x8
+	.matrix_2_addr = 0xc
+	.res_addr = 0x10
+	.local_res = -sizeof.MATRIX
+	
+	push	ebp
 	mov		ebp, esp
 	
-	push	eax 
-	push	ebx 
-	push	edi
-	push	edx 	
-	push	esi 
-	push	ecx 
+	sub		esp, sizeof.MATRIX
 	
-	mov		esi, dword [ebp + .base_matrix_addr]
-	mov		ebx, dword [ebp + .matrix_mulr_addr]
-	mov		edi, dword [ebp + .matrix_prod_addr]
+	pusha
 	
-	mov		eax, dword [esi + Matrix.i]
-	mul		dword [ebx + Matrix.i]
-	mov		dword [edi + Matrix.i], eax
-	
-	mov		eax, dword [esi + Matrix.j]
-	mul		dword [ebx + Matrix.k]
-	add		eax, dword [edi + Matrix.i]
-	mov		dword [edi + Matrix.i], eax
-	
-	mov		eax, dword [esi + Matrix.i]
-	mul		dword [ebx + Matrix.j]
-	mov		dword [edi + Matrix.j], eax
-	
-	mov		eax, dword [esi + Matrix.j]
-	mul 	dword [ebx + Matrix.z]
-	add		eax, dword [edi + Matrix.j]
-	mov		dword [edi + Matrix.j], eax
+	mov		esi, dword [ebp + .matrix_1_addr]
+	mov		edi, dword [ebp + .matrix_2_addr]
 		
-	mov		eax, dword [esi + Matrix.k]
-	mul 	word [ebx + Matrix.i]
-	mov		dword [edi + Matrix.k], eax
+	; matrix_1.a * matrix_2.a + matrix_1.b * matrix_2.c
+	mov		eax, dword [esi + MATRIX.a]
+	mov		ebx, dword [edi + MATRIX.a]
+	xor		edx, edx
+	mul		ebx
+	mov		ecx, eax		; save matrix_1.a * matrix_2.a
 	
-	mov		eax, dword [esi + Matrix.z]
-	mul		dword [ebx + Matrix.k] 
-	add		eax, dword [edi + Matrix.k]
-	mov		dword [edi + Matrix.k], eax
+	mov		eax, dword [esi + MATRIX.b]
+	mov		ebx, dword [edi + MATRIX.c]
+	xor		edx, edx 
+	mul		ebx
+	add		eax, ecx
 	
-	mov		eax, dword [esi + Matrix.k]
-	mul		dword [ebx + Matrix.j]
-	mov		dword [edi + Matrix.z], eax
-		
-	mov		eax, dword [esi + Matrix.z] 
-	mul		dword [ebx + Matrix.z]
-	add		eax, dword [edi + Matrix.z]
-	mov		dword [edi + Matrix.z], eax		
-		
-	pop		ecx 
-	pop		esi
-	pop		edx 
-	pop  	edi 
-	pop		ebx 
-	pop		eax 
+	mov		dword [ebp + .local_res + MATRIX.a], eax
 	
-	pop		ebp
-	ret 
+	; matrix_1.a * matrix_2.b + matrix_1.b * matrix_2.d
+	mov		eax, dword [esi + MATRIX.a]
+	mov		ebx, dword [edi + MATRIX.b]
+	xor		edx, edx 
+	mul		ebx
+	mov		ecx, eax
 	
-;==========================
-; power_matrix(matrix_addr, exp)
-; 
-; Input: address of the matrix to power, and the exponent
-; Operation: repeitive the matrix to itself exponent time
-; Ouput: eax = address of the result of 16 bytes
-;
+	mov		eax, dword [esi + MATRIX.b]
+	mov		ebx, dword [edi + MATRIX.d]
+	xor		edx, edx
+	mul		ebx
+	add		eax, ecx
+	
+	mov		dword [ebp + .local_res + MATRIX.b], eax
+	
+	; matrix_1.c * matrix_2.a + matrix_1.d * matrix_2.c
+	mov		eax, dword [esi + MATRIX.c]
+	mov		ebx, dword [edi + MATRIX.a]
+	xor		edx, edx 
+	mul		ebx
+	mov		ecx, eax
+	
+	mov		eax, dword [esi + MATRIX.d]
+	mov		ebx, dword [edi + MATRIX.c]
+	xor		edx, edx 
+	mul		ebx
+	add		eax, ecx
+	
+	mov		dword [ebp + .local_res + MATRIX.c], eax
+	
+	; matrix_1.c * matrix_2.b + matrix_1.d * matrix_2.d
+	mov		eax, dword [esi + MATRIX.c]
+	mov		ebx, dword [edi + MATRIX.b]
+	xor		edx, edx
+	mul		ebx
+	mov		ecx, eax
+	
+	mov		eax, dword [esi + MATRIX.d]
+	mov		ebx, dword [edi + MATRIX.d]
+	xor		edx, edx
+	mul		ebx
+	add		eax, ecx 
+	
+	mov		dword [ebp + .local_res + MATRIX.d], eax
+	
+	; Finally, copy local reuslt into the res_addr for to return
+	lea 	esi, dword [ebp + .local_res]
+	mov		edi, dword [ebp + .res_addr]
+	
+	mov		eax, dword [esi + MATRIX.a]
+	mov		dword [edi + MATRIX.a], eax
+	
+	mov		eax, dword [esi + MATRIX.b]
+	mov		dword [edi + MATRIX.b], eax
+	
+	mov		eax, dword [esi + MATRIX.c]
+	mov		dword [edi + MATRIX.c], eax
+	
+	mov		eax, dword [esi + MATRIX.d]
+	mov		dword [edi + MATRIX.d], eax
+	
+.done:
+	popa 
 
-power_matrix:
-	.matrix_addr = 8h 
-	.exp = 0ch
-	push	ebp 
-	mov		ebp, esp
-	sub		esp, sizeof.Matrix * 2
+	mov		esp, ebp
+	pop		ebp
+	ret
 	
-	.matrix_mulr = sizeof.Matrix
-	.matrix_prod = sizeof.Matrix * 2
+	
+;============================================
+; matrix_power(matrix_addr, power, res_addr)
+;============================================
+matrix_power:
+	.matrix_addr = 0x8
+	.power = 0xc
+	.res_addr = 0x10
+	
+	push	ebp
+	mov		ebp, esp
 	
 	push	esi
 	push	edi
-	push	ecx 
+	push	eax
+	push	ecx
 	
-	mov		ecx, dword [ebp + .exp] 
-	jecxz 	.identity_matrix 
-	cmp		ecx, 1h
-	je		.power_1
 	mov		esi, dword [ebp + .matrix_addr]
-		
-	lea		eax, dword [ebp - .matrix_prod]
-	push	eax 
-	push	esi
-	call	copy_matrix
-	add		esp, 4*2 
+	mov		edi, dword [ebp + .res_addr]
 	
-	lea		eax, dword [ebp - .matrix_mulr]
-	push	eax 
+	push	edi
 	push	esi
 	call	copy_matrix
-	add		esp, 4*2 
+	add		esp, 4*2
+
+	mov		ecx, dword [ebp + .power]
+	test	ecx, ecx
+	jz		.empty_matrix
+	cmp		ecx, 1
+	jbe		.done
+	dec		ecx
 	
 .next_mul:
-	lea 	eax, dword [ebp - .matrix_prod]
-	push	eax 
-	lea		eax, dword [ebp - .matrix_mulr]
-	push	eax 
-	mov		esi, dword [ebp + .matrix_addr]
+	push	edi
+	push	edi
 	push	esi
 	call	mul_matrices
 	add		esp, 4*3
-		
-	lea		eax, dword [ebp - .matrix_mulr]
-	push	eax 
-	lea 	eax, dword [ebp - .matrix_prod]
-	push	eax 
-	call	copy_matrix
-	add		esp, 4*2 
-		
-	dec		ecx 
-	cmp		ecx, 1h
-	jnz		.next_mul 
-	jmp		.power_done
-		
-.identity_matrix:
-	lea 	eax, dword [ebp - .matrix_prod] 
-	mov		dword [eax + Matrix.i], 1
-	mov		dword [eax + Matrix.j], 0
-	mov		dword [eax + Matrix.k], 0
-	mov		dword [eax + Matrix.z], 1
-	jmp		.power_done
 	
-.power_1:
-	lea 	eax, dword [ebp - .matrix_prod]
-	push	eax
-	push	esi 
-	call	copy_matrix
-	add		esp, 4*2 
-		
-.power_done:	
-	lea 	eax, dword [ebp - .matrix_prod] 
-		
-	pop		ecx 
+	dec		ecx
+	cmp		ecx, 0
+	ja		.next_mul
+	
+	jmp		.done
+.empty_matrix:
+	mov		dword [edi + MATRIX.a], 1
+	mov		dword [edi + MATRIX.b], 0
+	mov		dword [edi + MATRIX.c], 1
+	mov		dword [edi + MATRIX.d], 0
+
+.done:
+	pop		ecx
+	pop		eax
 	pop		edi
 	pop		esi
-		
-	add		esp, sizeof.Matrix * 2
-	
-	pop		ebp 
-	ret 
 
+	mov		esp, ebp
+	pop		ebp
+	ret
+	
+
+;======================================================
+; copy_matrix(src_addr, dst_addr)
+;======================================================
+copy_matrix:
+	.src_addr = 0x8
+	.dst_addr = 0xc
+	
+	push	ebp
+	mov		ebp, esp
+	
+	push	esi
+	push	edi
+	push	eax
+	
+	mov		esi, dword [ebp + .src_addr]
+	mov		edi, dword [ebp + .dst_addr]
+	
+	mov		eax, dword [esi + MATRIX.a]
+	mov		dword [edi + MATRIX.a], eax
+	
+	mov		eax, dword [esi + MATRIX.b]
+	mov		dword [edi + MATRIX.b], eax
+	
+	mov		eax, dword [esi + MATRIX.c]
+	mov		dword [edi + MATRIX.c], eax
+		
+	mov		eax, dword [esi + MATRIX.d]
+	mov		dword [edi + MATRIX.d], eax
+	
+.done:
+	pop		eax
+	pop		edi
+	pop		esi
+
+	mov		esp, ebp
+	pop		ebp
+	ret
+
+;======================================================
+; print_matrix(matrix_addr)
+;======================================================
+print_matrix:
+	.matrix_addr = 0x8
+	
+	push	ebp
+	mov		ebp, esp
+	
+	push	esi
+	push	eax
+	
+	mov		esi, dword [ebp + .matrix_addr]
+	
+	mov		eax, dword [esi + MATRIX.a]
+	call	print_eax
+	
+	mov		eax, dword [esi + MATRIX.b]
+	call	print_eax
+	
+	mov		eax, dword [esi + MATRIX.c]
+	call	print_eax
+		
+	mov		eax, dword [esi + MATRIX.d]
+	call	print_eax
+	
+.done:
+	pop		eax 
+	pop		esi
+
+	mov		esp, ebp
+	pop		ebp
+	ret
 
 include 'training.inc'

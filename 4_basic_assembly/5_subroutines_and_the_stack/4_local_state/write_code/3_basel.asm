@@ -50,535 +50,431 @@
 		
     ; 5.  Bonus: What value does this sum approximate?
 	; => The value of the sum approximate π^2/6 ≈ 1.64493407
-;	
 
 format PE console
-entry start 
+entry start
 
-include 'win32a.inc'
+include 'win32a.inc' 
 
-struct FRACTION 
-	numer	dd	? 
-	denom	dd	? 
-ends 
+struct FRAC
+	numer		dd	?
+	denom		dd	?
+ends
+
+section '.data' data readable writeable
+	delimiter 	db		'----------',0xd,0xa,0
+	hex_pre		db		'0x',0
+	space		db		' ',0
 	
-BASEL_MAX = 9h 
-BASEL_MIN = 1h
-	
-section '.data' data readable writeable 
-	frac_delim		db	'---',13,10,0
-	result_is		db  'The result of the sum',13,10
-					db  ' 1/(1^2) + 1/(2^2) + 1/(3^2) + ... + 1/(9^2) = ',0
-		
 section '.bss' readable writeable
-	frac_1 		FRACTION	?
-	frac_2 		FRACTION	? 
+	frac_1		FRAC		?
+	frac_2		FRAC		?
+	frac_res	FRAC		?
 	
-section '.text' code readable executable 
-start:
-	mov		eax, [esp]
-	call 	print_eax 
+section '.text' code readable executable
 
-	; initalize the frac_2 to be the 0/1,  
-	; storing the sum of each iteration
+start:
+	push	frac_res
+	push	9
+	call	compute_finite_series
+	add		esp, 4*2
 	
-	mov		eax, 0h				
-	mov		ebx, 1h
-	mov		esi, frac_2 
-	push	esi
-	push	ebx 
-	push	eax 
-	call	create_fraction
-	add		esp, 4*3 
-	
-	mov		ecx, BASEL_MIN
-sum_next:
-	; Initialize frac_1 to be the next element to add
-	mov		ebx, 1h				; numerator is always 1 
-	mov		eax, ecx 			
-	mul		eax 				; denominator is from (1 -> 9)^2 
-	mov		esi, frac_1 
-	push	esi
-	push	eax 
-	push	ebx 
-	call	create_fraction
-	add		esp, 4 * 3
-	
-	; add both fractions together
-	; eax returned with address of the stack memory
-	; of the local variable for the numerator and denominator 
-	mov		esi, frac_1 
-	mov		edi, frac_2 
-	push	edi				; replace sum into frac_2 
-	push	edi 
-	push	esi
-	call	add_fractions
-	add		esp, 4 * 3
-		
-	inc		ecx 
-	cmp		ecx, BASEL_MAX 
-	jbe  	sum_next
-		
-	mov		esi, result_is
-	call 	print_str 
-				
-	mov		esi, frac_2
-	push	esi
-	call	print_fraction
+	push	frac_res 
+	call	print_frac
 	add		esp, 4
 	
-	mov		eax, [esp]
-	call 	print_eax 
-	
+    ; Exit the process:
 	push	0
 	call	[ExitProcess]
+
+;============================
+; compute_finite_series(n, frac_res_addr)
+;============================
+compute_finite_series:
+	.n 				= 0x8
+	.frac_res_addr 	= 0xc 
 	
-;===================================
-; add_fractions(frac_addr_1, frac_addr_2, sum_frac_addr)
-;
-; Input: addresses of both fractions, and an address of fraction to store the sum
-; Ouput: void, sum_frac_addr filled with the sum of both fractions
-; Operation: 
-; 	Get the LCM of both denominators and compute the sum of both numerators based on LCM 
-; 
-add_fractions:
-	.frac_addr_1 = 8h
-	.frac_addr_2 = 0ch 
-	.sum_frac_addr = 10h 
-	push 	ebp 
-	mov		ebp, esp
-	sub     esp, sizeof.FRACTION
-	
-	.sum_numer_offset = -8h
-    .sum_denom_offset = -4h
-	
-	push	esi
-	push	edi
-	push	edx 
-	push	ecx 
-	push	ebx 
-	push	eax 
-	
-	mov		esi, dword [ebp + .frac_addr_1]
-	mov		edi, dword [ebp + .frac_addr_2]
-			
-	;=================================
-	; Get product of both denominator
-	;================================= 
-	mov		eax, dword [esi + FRACTION.denom]
-	mov		ebx, dword [edi + FRACTION.denom]
-	mul		ebx 
-	mov		ecx, eax 			; ecx = product 
-	
-	;===============================
-	; Get GCD of both denominator
-	;===============================
-	mov		eax, dword [esi + FRACTION.denom]
-	mov		ebx, dword [edi + FRACTION.denom]
-	push	ebx 
-	push	eax
-	call	stein 
-	add		esp, 4*2 			; eax has GCD 
-	
-	;===============================
-	; Get the LCM = product / GCD 
-	;===============================
-	mov		ebx, eax 			; swap eax and ecx
-	mov		eax, ecx 			; eax is not product 		
-	mov		ecx, ebx 			; ecx is GCD to divide 
-	div		ecx 				; eax is now LCM after division
-	
-	;=========================================
-	; store LCM as the denominator of the sum
-	;=========================================
-	mov dword [ebp + .sum_denom_offset], eax
-		
-	;=========================================
-	; compute for the numerator of the sum 
-	;=========================================
-	mov		eax, dword [ebp + .sum_denom_offset]
-    mov 	ebx, dword [esi + FRACTION.denom]
-    div 	ebx 
-    mov 	ebx, dword [esi + FRACTION.numer]
-    mul 	ebx
-    mov 	dword [ebp + .sum_numer_offset], eax 
-    
-    mov 	eax, dword [ebp + .sum_denom_offset]
-    mov 	ebx, dword [edi + FRACTION.denom]
-    div 	ebx 
-    mov 	ebx, dword [edi + FRACTION.numer]
-    mul 	ebx 
-		
-    add 	eax, dword [ebp + .sum_numer_offset]
-    mov 	dword [ebp + .sum_numer_offset], eax 
-	
-	mov		edi, dword [ebp - .sum_frac_addr] 
-	mov		eax, dword [ebp + .sum_numer_offset]
-	mov		dword [edi + FRACTION.numer], eax
-		
-	mov		eax, dword [ebp + .sum_denom_offset]
-	mov		dword [edi + FRACTION.denom], eax
-	
-	push	edi
-	call	reduce_fraction
-	add		esp, 4
-	
-.end_func:
-	pop		eax 
-	pop		ebx 
-	pop		ecx 
-	pop		edx 
-	pop		edi 
-	pop		esi 
-	
-	add 	esp, sizeof.FRACTION
-	
-	pop		ebp
-	ret 
-	
-;===================================
-; create_fraction(numer, denom, frac_addr) 
-; 
-; Input: numerator, denominator, address of the destination fraction
-; Output: void 
-; Operation: copy enumerator and denominator to relevant offset in destination fraction
-;
-create_fraction:
-	.numer = 8h 
-	.denom = 0ch 
-	.frac_addr = 10h 
 	push	ebp
 	mov		ebp, esp
 	
-	push	esi 
-	push	eax 
+	.tmp_frac_1 	= -1*sizeof.FRAC
+	.tmp_frac_2 	= -2*sizeof.FRAC
+	.tmp_frac_res 	= -3*sizeof.FRAC
+	sub		esp, 3*sizeof.FRAC
 	
-	mov		esi, dword [ebp + .frac_addr] 
-	mov		eax, dword [ebp + .numer]
-	mov		dword [esi + FRACTION.numer], eax 
-	mov		eax, dword [ebp + .denom]
-	mov		dword [esi + FRACTION.denom], eax 
+	pusha 
 	
-	mov		eax, dword [esi + FRACTION.numer]
-	test	eax, eax 
-	jz 		.end_func
-		
-	mov		eax, dword [esi + FRACTION.denom]
-	test	eax, eax 
-	jz 		.end_func
-		
-	push	esi
-	call	reduce_fraction
-	add		esp, 4
-
-.end_func:
-
-	pop		eax 
-	pop		esi 
+	; Check if n >= 2
+	mov		ecx, dword [ebp + .n]
+	cmp		ecx, 2
+	jb		.done_add
 	
-	pop		ebp 
-	ret 
-	
-;===================================
-; reduce_fraction(frac_addr)
-; 
-; Input: address of the fraction
-; Ouput: void, altering the original value stored at the address 
-; Operation: transform the fraction into reduced from 
-; 	e.g: 2/4 -> 1/2 
-;
-reduce_fraction:
-	.frac_addr = 8h
-	push	ebp 
-	mov		ebp, esp
-	
-	.num_1 = -4h
-	.num_2 = -8h
-	.numer_smaller = -0ch
-	sub		esp, 4*3
-	
-	push	esi
+	; Construct the initial frac 1/1^2
+	lea 	edi, dword [ebp + .tmp_frac_res]
 	push	edi
-	push	eax 
-	push	edx 
-	push	ebx 
-	push	ecx 
-	
-	xor 	ecx,ecx 
-	xor 	ebx, ebx 
-	xor		edx, edx 
-	xor		eax, eax 
-	
-	mov		esi, dword [ebp + .frac_addr]	
-	mov		dword [ebp + .numer_smaller], 1 
-	mov		edi, dword [esi + FRACTION.numer]
-	mov		ebx, dword [esi + FRACTION.denom] 
-	cmp		edi, ebx
-	je		.is_one
-	jb		.reduce
-	mov		dword [ebp + .numer_smaller], 0
-	push	edi 
-	push	ebx 
-	pop		edi 
-	pop		ebx
-	jmp		.reduce 
-	
-.is_one:
-	mov		eax, 1
-	mov		ebx, 1 
-	jmp		.set_reduce
-	
-.reduce:
-	mov		ecx, edi 
-	
-.divisor_loop:
-	mov		eax, edi 
-	xor 	edx, edx 
-	div		ecx 
-	mov		dword [ebp + .num_1], eax
-	test	edx, edx 	
-	jnz		.not_divisor
-			
-	mov		eax, ebx 
-	xor		edx, edx 
-	div		ecx 
-	mov		dword [ebp + .num_2], eax 
-	test	edx, edx 
-	jz		.divisor_found
-	
-.not_divisor:
-	dec		ecx 
-	jnz		.divisor_loop 
-	jmp		.divisor_not_found 
-	
-.divisor_found:
-	mov		eax, dword [ebp + .numer_smaller]
-	test	eax, eax 
-	jnz 	.denom_num_2 
-.denom_num_1:
-	mov		eax, dword [ebp + .num_2]
-	mov		ebx, dword [ebp + .num_1]
-	jmp		.set_reduce
-.denom_num_2:
-	mov		eax, dword [ebp + .num_1]
-	mov		ebx, dword [ebp + .num_2]
-	
-.set_reduce:
-	mov		dword [esi + FRACTION.numer], eax 
-	mov		dword [esi + FRACTION.denom], ebx 
-		
-	jmp 	.end
-		
-.divisor_not_found:
-	jmp 	.end
-	
-.end:	
-	pop		ecx 
-	pop		ebx 
-	pop		edx 
-	pop		eax 
-	pop		edi
-	pop		esi
-	
+	push	1
+	push	1
+	call	construct_frac
 	add		esp, 4*3
 	
-	pop		ebp 
-	ret 
-		
-;==========================================
-; hex_to_dec_ascii(hex, str_addr, str_size)
-;
-hex_to_dec_ascii:
-	.hex = 8h
-	.str_addr = 0ch
-	.str_size = 10h
-	push	ebp 
-	mov		ebp, esp 	
-		
-	push	esi 
-	push	edi 
+	; Prepare to get to the add loop
+	mov		ebx, 2
+.next_add:
+	; Copy the prev result into first operand
+	lea		esi, dword [ebp + .tmp_frac_res]
+	lea		edi, dword [ebp + .tmp_frac_1]
+	
+	mov		eax, dword [esi + FRAC.numer]
+	mov		dword [edi + FRAC.numer], eax
+	
+	mov		eax, dword [esi + FRAC.denom]
+	mov		dword [edi + FRAC.denom], eax
+	
+	; Compute the next frac denom
+	mov		eax, ebx 
+	xor		edx, edx
+	mul		eax				; a^2
+	
+	; Construct the other operand frac
+	lea		edi, dword [ebp + .tmp_frac_2]
+	push	edi
+	push	eax
+	push	1
+	call	construct_frac
+	add		esp, 4*3
+	
+	; Add both fracs into temporary result
+	lea		esi, dword [ebp + .tmp_frac_1]
+	lea		edi, dword [ebp + .tmp_frac_2]
+	lea		edx, dword [ebp + .tmp_frac_res]
+	
 	push	edx 
-	push	ebx 
-	push	ecx 
-	push	eax 
+	push	edi
+	push	esi
+	call	add_fracs
+	add		esp, 4*3
 	
-	mov		esi, dword [ebp + .str_addr]
-	mov		edi, dword [ebp + .str_size]
-	mov		eax, dword [ebp + .hex]
-	mov		ebx, 10d 
-	mov		ecx, 0
+	inc		ebx
+	cmp		ebx, ecx
+	jbe		.next_add
 	
-.compute_dec_digit:
-	xor 	edx, edx 
-	div		ebx 
-	add		edx, 30h 
+.done_add:
+	; Copy the result into the out variable
+	lea		esi, dword [ebp + .tmp_frac_res]
+	mov		edi, dword [ebp + .frac_res_addr]
 	
-	mov		esi, dword [ebp + .str_addr]
-	lea		esi, [esi + ecx] 	
-	mov		byte [esi], dl  
+	mov		eax, dword [esi + FRAC.numer]
+	mov		dword [edi + FRAC.numer], eax
+	mov		eax, dword [esi + FRAC.denom]
+	mov		dword [edi + FRAC.denom], eax
+
+.epilogue:
+	popa 
 	
-	call	print_str 
-	
-	inc 	ecx	
-	cmp		ecx, edi 
-	jz 		.done 
-	test 	eax, eax 
-	jnz		.compute_dec_digit
-		
-.done:
-; .reverse_dec_num_str:
-	; mov		edx, ecx 
-	; dec		edx 
-	; shr 	ecx, 1
-	; xor 	ebx, ebx 
-	; mov		esi, dword [ebp + .str_addr]
-		
-; .reverse_next_char:
-	; mov		al, byte [esi + ebx]
-	; mov		ah, byte [esi + edx] 
-	; mov		byte [esi + ebx], ah
-	; mov		byte [esi + edx], al  
-	; inc		ebx 
-	; dec 	edx 
-	; clc 	
-	; dec 	ecx 
-	; jnz 	.reverse_next_char
-; .reverse_done:
-	; mov		ecx, dword [ebp + .str_size]
-	; mov		byte [esi + ecx], 0 
-	
-	pop		eax 
-	pop		ecx 
-	pop		ebx 
-	pop		edx 
-	pop		edi
-	pop		esi 
-		
+	mov		esp, ebp
 	pop		ebp
 	ret 
-		
-;==========================================
-; print_fraction(frac_addr)
-; 	
-print_fraction: 
-	.frac_addr = 8h 
-	push	ebp 
+
+;============================
+; construct_frac(a, b, dst_addr)
+;============================
+construct_frac:
+	.a = 0x8
+	.b = 0xc 
+	.dst_addr = 0x10
+	
+	push	ebp
+	mov		ebp, esp
+	
+	push	edi
+	push	eax 
+	push	ebx
+	
+	mov		edi, dword [ebp + .dst_addr]
+	mov		eax, dword [ebp + .a]
+	mov		ebx, dword [ebp + .b]
+	
+	mov		dword [edi + FRAC.numer], eax
+	mov		dword [edi + FRAC.denom], ebx
+	
+	push	edi
+	call	reduce_frac
+	add		esp, 4
+	
+.done:
+	pop		ebx
+	pop		eax
+	pop		edi
+
+	mov		esp, ebp
+	pop		ebp
+	ret
+
+;=======================================
+; reduce_frac(frac_addr)
+;=======================================
+reduce_frac:
+	.frac_addr = 0x8
+	
+	push	ebp
 	mov		ebp, esp
 	
 	push	esi
-	push	eax 
-		
-	jmp     .print_eax_after_data
-	.numer		 	 db			'Hello world',0
-	.denom		 	 db			40h  dup (?)
-	.print_eax_fmt   db          "%x/%x",10,13,0
-.print_eax_after_data:
+	push	eax
+	push	ebx
+	push	edx
 	
-	; mov		eax, 40h
-	; push	eax 
-	; mov		eax, .numer 
-	; push	eax 
-	; mov		eax, dword [esi + FRACTION.numer]
-	; push	eax 
-	; call	hex_to_dec_ascii
-	; add		esp, 4*3 
-				
 	mov		esi, dword [ebp + .frac_addr]
-	mov		eax, dword [esi + FRACTION.denom]
-	push	eax 
-	mov		eax, dword [esi + FRACTION.numer]
-	push    eax 
-	push    .print_eax_fmt
-	call    [printf]
-	add     esp,4*3 
+	mov		eax, dword [esi + FRAC.numer]
+	mov		ebx, dword [esi + FRAC.denom]
 	
-.end:	
+	push	ebx
+	push	eax
+	call	stein
+	add		esp, 4*2
+	
+	mov		ebx, eax 
+	
+	mov		eax, dword [esi + FRAC.numer]
+	xor		edx, edx 
+	div		ebx
+	mov		dword [esi + FRAC.numer], eax 
+	
+	mov		eax, dword [esi + FRAC.denom]
+	xor		edx, edx 
+	div		ebx
+	mov		dword [esi + FRAC.denom], eax 
+	
+.done:
+	pop		edx
+	pop		ebx
 	pop		eax 
 	pop		esi
 	
-	pop		ebp 
+	mov		esp, ebp
+	pop		ebp
+	ret
+	
+;=======================================
+; add_fracs(frac_1_addr, frac_2_addr, frac_res_addr)
+;=======================================
+add_fracs:
+	.frac_1_addr = 0x8
+	.frac_2_addr = 0xc
+	.frac_res_addr = 0x10
+	.temp = -0x4
+	
+	push 	ebp
+	mov		ebp, esp
+	
+	pusha
+	
+	mov		esi, dword [ebp + .frac_1_addr]
+	mov		edi, dword [ebp + .frac_2_addr]
+	mov		ecx, dword [ebp + .frac_res_addr]
+	
+	mov		eax, dword [esi + FRAC.denom]
+	mov		ebx, dword [edi + FRAC.denom]
+	
+	push	ebx
+	push	eax
+	call	lcm
+	add		esp, 4*2
+
+	mov		dword [ecx + FRAC.denom], eax
+	
+	; Find a*(L/b)
+	mov	 	eax, dword [ecx + FRAC.denom]
+	mov		ebx, dword [esi + FRAC.denom]
+	xor		edx, edx
+	div		ebx			 					; (L/b)
+	
+	mov		ebx, dword [esi + FRAC.numer]	
+	xor		edx, edx
+	mul		ebx
+	mov		dword [ebp + .temp], eax		; a * (L/b)
+	
+	; Find c*(L/d)
+	mov	 	eax, dword [ecx + FRAC.denom]
+	mov		ebx, dword [edi + FRAC.denom]
+	xor		edx, edx
+	div		ebx			 					; (L/d)
+		
+	mov		ebx, dword [edi + FRAC.numer]	;
+	xor		edx, edx
+	mul		ebx								; c * (L/d)
+	
+	add		eax, dword [ebp + .temp]		; a * (L/b) + c * (L/d) 		
+	
+	mov		dword [ecx + FRAC.numer], eax
+	
+.done:
+	popa 
+	
+	mov		esp, ebp
+	pop		ebp
+	ret
+	
+;=======================================
+; print_frac(frac_addr)
+;=======================================
+print_frac:
+	.frac_addr = 0x8
+	
+	push	ebp
+	mov		ebp, esp
+	
+	push	eax
+	push	ebx
+	push	esi
+	
+	mov		esi, space
+	call	print_str
+	
+	mov		esi, hex_pre
+	call	print_str
+	
+	mov		ebx, dword [ebp + .frac_addr]
+	mov		eax, dword [ebx + FRAC.numer]
+	call	print_eax
+	
+	mov		esi, delimiter
+	call	print_str
+		
+	mov		esi, space
+	call	print_str
+	
+	mov		esi, hex_pre
+	call	print_str
+	
+	mov		eax, dword [ebx + FRAC.denom]
+	call	print_eax
+.done:
+	pop		esi
+	pop		ebx
+	pop		eax
+
+	mov		esp, ebp
+	pop		ebp
 	ret 
 	
+;=======================================
+; lcm(a, b)
+;=======================================	
+lcm:
+	.a = 0x8
+	.b = 0xc 
+	
+	push	ebp
+	mov		ebp, esp
+	
+	push	ebx
+	push	ecx
+	push	edx 
+	
+	mov		eax, dword [ebp + .a]	; a
+	mov		ebx, dword [ebp + .b]	; b
+	
+	push	eax
+	push	ebx
+	call	stein
+	add		esp, 4*2
+	
+	mov		ecx, eax				; GCD (a, b)
+	mov		eax, dword [ebp + .a]	; a 
+	mov		ebx, dword [ebp + .b]	; b
+	
+	xor		edx, edx 
+	mul		ebx						; a * b
+	xor		edx, edx
+	div		ecx						; (a*b) / GCD(a, b)
+	
+.done:
+	pop		edx 
+	pop		ecx
+	pop		ebx
+
+	mov		esp, ebp
+	pop		ebp
+	ret 
+
+
 ; ===========================================================
 ; stein(a,b)
 ;
 ; Input:
-;   number a and number b 
+;   2 dwords a, b
 ; Output:
-;   eax = Greatest Common Divisor between a & b 
+;   gcd(a, b)
 ; Operations:
-;   continuously check a and b if they are odd/even 
-;	if a is even => a = a / 2
-;   if b is even => b = b / 2
-;	if both are odd, a = |a - b| / 2
-;	continue until any a or b is 0, the remainder is the GCD 
+;   
 ;
 stein:
-	.a = 8h
-	.b = 0ch
+    .a = 0x8
+    .b = 0xc 
 	
-	push	ebp 
-	mov		ebp, esp 
+    push	ebp
+	mov		ebp, esp
 	
-	push	esi
-	push	edi 
-	push	ecx 
-	push	ebx 
+    push    esi
+    push    edi
+    push    ecx
+    push    ebx
+
+    mov     esi,[ebp + .a]		; a 
+    mov     edi,[ebp + .b]		; b
 	
-	mov		esi, dword [ebp + .a]
-	mov		edi, dword [ebp + .b]
+    mov     eax,esi				; a
+    test    edi,edi				; if (b == 0), return a 
+    jz      .end_func
+
+    mov     eax,edi				; b
+    test    esi,esi				; if (a == 0) return b
+    jz      .end_func
 	
-	mov		eax, esi 
-	test 	edi, edi
-	jz 		.end_func
+    xor     ebx,ebx				; val
+
+    mov     ecx,esi				
+    not     ecx					
+    and     ecx,1				
+    shr     esi,cl				; if a is even, a /= 2
+    add     ebx,ecx				; and val += 1
 	
-	mov		eax, edi
-	test	esi, esi
-	jz		.end_func
+    mov     ecx,edi				
+    not     ecx
+    and     ecx,1
+    shr     edi,cl				; if b is even, b /= 2
+    add     ebx,ecx				; and val += 1
 	
-	xor 	ebx, ebx
-	
-	mov		ecx, esi
-	not		ecx 
-	and		ecx, 1
-	shr		esi, cl 
-	add		ebx, ecx 
-	
-	mov		ecx, edi
-	not		ecx 
-	and		ecx, 1
-	shr		edi, cl 
-	add		ebx, ecx 
-	
-	test	ebx, ebx
-	jnz		.not_both_odd 
-	
-	cmp		esi, edi 
-	jae		.a_bigger_equal 
-	xchg 	esi, edi 
-	
+    test    ebx,ebx				; val == 0 -> both a and b are odd
+    jnz     .not_both_odd
+
+    cmp     esi,edi				; If both are odd, swap a and b such that a >= b
+    jae     .a_bigger_equal
+    xchg    esi,edi         ; Exchanges the contents of esi,edi
 .a_bigger_equal:
-	sub		esi, edi 
-	shr		esi, 1 
-	
+
+    sub     esi,edi				; (a - b) / 2
+    shr     esi,1
 .not_both_odd:
-	push	edi
-	push	esi 
-	call	stein 
-	add		esp, 4*2  
-	
-	mov		ecx, ebx 
-	shr 	ecx, 1
-	shl		eax, cl 
+    
+    push    edi
+    push    esi
+    call    stein
+    add     esp,4*2
+
+    mov     ecx,ebx
+    shr     ecx,1
+    shl     eax,cl
 	
 .end_func:
-	pop		ebx 
-	pop		ecx 
-	pop		edi
-	pop		esi 
+    pop     ebx
+    pop     ecx
+    pop     edi
+    pop     esi
 	
+	mov		esp, ebp
 	pop		ebp
-	ret 
+    ret
 
-	
 include 'training.inc'

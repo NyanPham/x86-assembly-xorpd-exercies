@@ -93,149 +93,110 @@
           ; valid paths possible from S to E. 
 
           ; Add a piece of code to print this number.
-
-format PE console 
+		  
+format PE console
 entry start
 
-include 'win32a.inc'
+include 'win32a.inc' 
 
-N = 5
-	
-section '.bss' readable writeable 
-	temp 			dd 	?
-	num_paths		dd  N*N 	dup 	(?)
-	
-	
+TBL_SIZE = 0x5
+
+section '.bss' readable writeable
+	num_paths 	dd		TBL_SIZE*TBL_SIZE  dup  (?)
+	temp1		dd		?
+	temp2		dd		?
+    
 section '.text' code readable executable
-	
+
 start:
-	;=================================================
-	; Initialize top row and leftmost column to be 1
-	;=================================================
-	mov		esi, num_paths
-	mov		ecx, 0 
-		
-init_top_row_cell:
-	mov		dword [esi + ecx * 4], 1
-	inc 	ecx 
-	cmp 	ecx, N 
-	jnz 	init_top_row_cell
-			
-	mov		ecx, 1
-init_left_col_cell:
-	mov 	eax, ecx 
+    
+	;======================================
+	; Initialize num paths table
+	;======================================
+init_tbl:
+	mov		edi, num_paths
+	xor		ecx, ecx
+.next_cell:
+	; Cell on top
+	lea		edx, [edi + 4*ecx]
+	mov		dword [edx], 0x1
+	
+	mov		eax, ecx
+	mov		edx, TBL_SIZE
+	mul		edx
 	shl		eax, 2
-	mov		ebx, N
-	mul 	ebx
+	lea		edx, [edi + eax]
 	
-	mov 	dword [esi + eax], 1
+	mov		dword [edx], 0x1
 	
-	inc 	ecx
-	cmp 	ecx, N
-	jnz 	init_left_col_cell 
-		
-	;=================================================
-	; Compute the path num for each cell
-	;=================================================
-	mov		esi, num_paths
-	mov		ebx, 1					; row counter
-next_row:
-	mov		ecx, 1	 				; column counter
-next_cell:	
-	; get num paths at coords (i - 1, j)
-	dec 	ebx 
-	mov		eax, ecx 
-	shl		eax, 2
-	mov		edi, N
-	mul 	edi 
-	mov		edi, ebx 
-	shl		edi, 2
-	add		eax, edi 
-	mov		eax, dword [esi + eax]	; temp = num_paths(i - 1, j)
-	mov		dword [temp], eax
-	inc 	ebx
+	inc		ecx
+	cmp		ecx, TBL_SIZE
+	jb		.next_cell
 	
-	; get num paths at coords (i, j - 1)
-	dec 	ecx
-	mov		eax, ecx 
-	shl		eax, 2
-	mov		edi, N
-	mul 	edi 
-	mov		edi, ebx 
-	shl		edi, 2
-	add		eax, edi 	
-	mov		eax, dword [esi + eax]		
-	inc 	ecx 	
+	;======================================
+	; Populate num paths table
+	;======================================
+populate_tbl:
+	mov		edi, num_paths
+	mov		ebx, 0x1
+.next_row:
+	mov		ecx, 0x1
+.next_col:
+	; Get num_paths(i-1,j)
+	mov		eax, TBL_SIZE
+	mov		edx, ebx 
+	dec		edx
+	mul		edx
+	add		eax, ecx
+	shl		eax, 0x2
+	mov		eax, dword [edi + eax]
+	mov		dword [temp1], eax
 	
-	add		eax, dword [temp]		; eax = num_paths(i, j - 1) + num_paths(i - 1, j)
-	mov		dword [temp], eax 
+	; Get num_paths(i,j-1)
+	mov		eax, TBL_SIZE
+	mul		ebx
+	mov		edx, ecx
+	dec		edx
+	add		eax, edx
+	shl		eax, 0x2
+	mov		eax, dword [edi + eax]
+	mov		dword [temp2], eax
 	
-	mov		eax, ecx 
-	shl		eax, 2
-	mov		edi, N 
-	mul		edi
-	mov		edi, ebx 
-	shl		edi, 2
-	add		eax, edi 
-	mov		edi, dword [temp]
-	mov 	dword [esi + eax], edi
+	; Compute num_paths(i,j)
+	mov		eax,  TBL_SIZE
+	mul		ebx
+	add		eax, ecx
+	shl		eax, 0x2
+	mov		edx, eax
+	mov		eax, dword [temp1]
+	add		eax, dword [temp2]
+	mov		dword [edi + edx], eax
 	
-	inc 	ecx 
-	cmp 	ecx, N
-	jnz		next_cell
-		
-	inc 	ebx 
-	cmp		ebx, N
-	jnz 	next_row 
+	inc		ecx
+	cmp		ecx, TBL_SIZE
+	jb		.next_col
 	
-	;=====================================
+	inc		ebx
+	cmp		ebx, TBL_SIZE
+	jb		.next_row
+	
+	;======================================
 	; Print last cell
-	;=====================================
-	mov		ebx, N - 1
-	mov		ecx, N - 1
+	;======================================
+	mov		esi, num_paths
+	mov		ebx, TBL_SIZE-1
+	mov		ecx, TBL_SIZE-1
 	
-	mov 	eax, ecx 
-	mov		edi, N 
-	mul		edi
-	shl		eax, 2
-	mov		edi, ebx 
-	shl		edi, 2
-	add		eax, edi
+	mov		eax, TBL_SIZE
+	mul		ebx
+	add		eax, ecx
+	shl		eax, 0x2
 	mov		eax, dword [esi + eax]
-	call	print_eax 
-		
-	;====================
-	; Print all cells
-	;====================  
-	; mov 	ecx, 0 
-	; mov 	ebx, N
-; print_next:	
-	; xor 	edx, edx 
-	; mov		eax, ecx 
-	; div		ebx 
-	; cmp		edx, 0
-	; jnz 	not_next_row 
-	; call	print_delimiter 
-	
-; not_next_row:	
-	; mov		eax, dword [esi + ecx * 4]
-	; call	print_eax 
-	; inc 	ecx 
-	; cmp 	ecx, N * N 
-	; jnz 	print_next
-	
+	call	print_eax
+
+    ; Exit the process:
 	push	0
 	call	[ExitProcess]
-	
+
+
 include 'training.inc'
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	

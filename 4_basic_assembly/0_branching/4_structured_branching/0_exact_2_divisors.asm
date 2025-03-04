@@ -10,46 +10,50 @@
 format PE console
 entry start
 
-include 'win32a.inc'
+include 'win32a.inc' 
 
 ; ===============================================
 section '.text' code readable executable
-	
+
 start:
-	call read_hex 			; input N 
-	mov esi,eax 			; esi holds original N
-	mov ecx,2 				; loop counter until N 
-Iters:
-	mov ebx,0 				; count of divisibles 
-	mov edi,ecx 
-	dec edi 				; edi innerloop for as divisors 
-CheckDivisible:
-	mov edx,0
-	mov eax,ecx 
-	div edi 
-	cmp edx,0
-	jne NoRemainder 
-	inc ebx
+	call 	read_hex
+	mov		esi, eax	; input
+
+lower_print:			; outer loop, the lower number of input
+	dec		esi
+	cmp		esi, 1
+	jbe		done
 	
-NoRemainder:
-	dec edi 
-	cmp edi,1 
-	ja CheckDivisible
-	
-	cmp ebx, 2
-	jne No2Divisors 
-			
-Has2Divisors:
-	mov eax,ecx
-	call print_eax 
-	
-No2Divisors:	
-	inc ecx 
-	cmp ecx,esi 
-	jbe Iters 
+	mov		ecx, esi	 
+	dec		ecx			
+	mov		ebx, 0		
+count_divisor:			; inner loop, check if its divisors count is 2
+	mov		edx, 0
+	mov		eax, esi
+	div		ecx 
+	cmp		edx, 0
+	jnz		skip_count
+	inc		ebx 
 		
+skip_count:
+	dec		ecx
+	cmp		ecx, 0x1
+	ja		count_divisor
+	
+	cmp		ebx, 0x2
+	jne		skip_print
+	
+	mov		eax, esi
+	call	print_eax
+
+skip_print:
+	jmp		lower_print
+
+done:
+	
     ; Exit the process:
 	push	0
 	call	[ExitProcess]
 
 include 'training.inc'
+
